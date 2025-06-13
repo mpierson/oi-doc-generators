@@ -27,6 +27,6 @@ Notes:
 - IP addresses of assets, mail server, archive servers, etc. are included in export
 
 
-Apply the _ASPSAsBuiltToMD.xsl_ transform to convert the exported XML file to Markdown.  The resulting Markdown document includes diagrams in the PlantUML language.
+Once the SPP configs have been exported as XML, apply the _ASPSAsBuiltToMD.xsl_ transform to convert the export file to Markdown.  The resulting Markdown document includes diagrams in the PlantUML language.
 
 
