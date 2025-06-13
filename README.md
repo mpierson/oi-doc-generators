@@ -46,4 +46,18 @@ Transform pre-requisites:
 - OIS-IPv4Lib.xsl transform library
 
 
+## syslog-ng Store Box
+
+Use /opt/ssb/var/db/ssb.xml, or extract _config.xml_ from an export or support bundle.
+
+Apply the _SSBAsBuiltToMD.xsl_ transform to convert the configuration file to Markdown.  The resulting Markdown document includes diagrams in the PlantUML language.
+
+Transform pre-requisites:
+
+- XSLT v2 processor (e.g. SaxonB)
+- OIS-IPv4Lib.xsl transform library
+- OIS-JSONLib.xsl transform library
+- OIS-SSBMIBsLib.xsl transform library, including MIB definitions
+
+
 
