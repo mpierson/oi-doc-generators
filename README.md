@@ -9,8 +9,10 @@ Use the ExportSPP.ps1 PowerShell script to export SPP configs as XML.
 
 Usage:
 
+``` sh
    Connect-Safeguard
    ./ExportSPP.ps1 > spp-configs.xml
+```
 
 Export pre-requisites:
 
