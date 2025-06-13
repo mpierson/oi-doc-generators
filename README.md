@@ -60,4 +60,31 @@ Transform pre-requisites:
 - OIS-SSBMIBsLib.xsl transform library, including MIB definitions
 
 
+## One Identity Manager
+
+Use the golang DB exporter to generate an XML document of OneIM configuration.
+
+
+Export pre-requisites:
+
+- SQLServer username and password with (at least) read access to OneIM database
+- platform-specific version of exporter
+
+
+Use one or more of the following transforms to create Markdown:
+
+- AsBuiltToMD-Configuration.xsl
+- AsBuiltToMD-Customization.xsl
+- AsBuiltToMD-WebProjects.xsl
+
+Markdown files may include diagrams in the PlantUML and R (ggplot2) languages.
+
+Transform pre-requisites:
+
+- XSLT v2 processor (e.g. SaxonB)
+- OIS-IPv4Lib.xsl transform library
+- OIS-StringLib.xsl transform library
+- OIS-MarkdownLib.xsl transform library
+- OIS-PlantUMLLib.xsl transform library
+- schedules.R and timeline\_plot.R scripts
 
