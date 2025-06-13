@@ -3,7 +3,7 @@
 A collection of as-built document generators for One Identity products.
 
 
-# Safeguard for Privileged Passwords
+## Safeguard for Privileged Passwords
 
 Use the ExportSPP.ps1 PowerShell script to export SPP configs as XML.
 
@@ -27,6 +27,23 @@ Notes:
 - IP addresses of assets, mail server, archive servers, etc. are included in export
 
 
-Once the SPP configs have been exported as XML, apply the _ASPSAsBuiltToMD.xsl_ transform to convert the export file to Markdown.  The resulting Markdown document includes diagrams in the PlantUML language.
+Once the SPP configs have been exported as XML, apply the _SPPAsBuiltToMD.xsl_ transform to convert the export file to Markdown.  The resulting Markdown document includes diagrams in the PlantUML language.
+
+Transform pre-requisites:
+
+- XSLT v2 processor (e.g. SaxonB)
+
+
+## Safeguard for Privileged Sessions
+
+Use /opt/scb/var/db/scb.xml, or extract _config.xml_ from an export or support bundle.
+
+Apply the _SPSAsBuiltToMD.xsl_ transform to convert the configuration file to Markdown.  The resulting Markdown document includes diagrams in the PlantUML language.
+
+Transform pre-requisites:
+
+- XSLT v2 processor (e.g. SaxonB)
+- OIS-IPv4Lib.xsl transform library
+
 
 
