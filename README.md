@@ -8,8 +8,9 @@ A collection of as-built document generators for One Identity products.
 Use the ExportSPP.ps1 PowerShell script to export SPP configs as XML.
 
 Usage:
-   >  Connect-Safeguard
-   > ./ExportSPP.ps1 > spp-configs.xml
+
+   Connect-Safeguard
+   ./ExportSPP.ps1 > spp-configs.xml
 
 Export pre-requisites:
 
