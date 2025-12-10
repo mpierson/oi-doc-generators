@@ -57,6 +57,18 @@
 
   </xsl:function>
 
+  <!-- Function to concat if first value is non-null -->
+  <xsl:function name="ois:concat-nonempty-string" as="xs:string">
+    <xsl:param name="s" as="xs:string?"/>
+    <xsl:param name="suffix" as="xs:string?"/>
+    
+    <xsl:variable name="result">
+        <xsl:value-of select="ois:is-empty-string($s, '', concat($s, $suffix))" />
+    </xsl:variable>
+    <xsl:value-of select="$result" />
+
+  </xsl:function>
+
 
 
   <!-- Return True or False based on boolean -->
@@ -127,5 +139,89 @@
        </xsl:if>
   </xsl:template>
 
+
+
+  <!-- XSLT HASH Fn   https://stackoverflow.com/questions/6753343/using-xsl-to-make-a-hash-of-xml-file -->
+  <xsl:function name="ois:checksum" as="xs:integer">
+        <xsl:param name="str" as="xs:string"/>
+        <xsl:variable name="codepoints" select="string-to-codepoints($str)"/>
+        <xsl:value-of select="ois:fletcher16($codepoints, count($codepoints), 1, 0, 0)"/>
+    </xsl:function>
+    <xsl:function name="ois:fletcher16">
+        <xsl:param name="str" as="xs:integer*"/>
+        <xsl:param name="len" as="xs:integer" />
+        <xsl:param name="index" as="xs:integer" />
+        <xsl:param name="sum1" as="xs:integer" />
+        <xsl:param name="sum2" as="xs:integer"/>
+        <xsl:choose>
+            <xsl:when test="$index gt $len">
+                <xsl:sequence select="$sum2 * 256 + $sum1"/>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:variable name="newSum1" as="xs:integer"
+                    select="($sum1 + $str[$index]) mod 255"/>
+                <xsl:sequence select="ois:fletcher16($str, $len, $index + 1, $newSum1,
+                        ($sum2 + $newSum1) mod 255)" />
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:function>
+
+  <!-- Return a well-formatted delimited list -->
+  <xsl:function name="ois:delimit-list" as="xs:string">
+    <xsl:param name="sep" as="xs:string"/>
+    <xsl:param name="s1" as="xs:string"/>
+    <xsl:param name="s2" as="xs:string"/>
+    <xsl:param name="s3" as="xs:string?"/>
+    <xsl:param name="s4" as="xs:string?"/>
+    <xsl:param name="s5" as="xs:string?"/>
+    <xsl:param name="s6" as="xs:string?"/>
+    <xsl:param name="s7" as="xs:string?"/>
+    <xsl:variable name="values">
+        <values>
+            <xsl:if test="string-length($s1) &gt; 0"><v><xsl:value-of select="$s1" /></v></xsl:if>
+            <xsl:if test="string-length($s2) &gt; 0"><v><xsl:value-of select="$s2" /></v></xsl:if>
+            <xsl:if test="string-length($s3) &gt; 0"><v><xsl:value-of select="$s3" /></v></xsl:if>
+            <xsl:if test="string-length($s4) &gt; 0"><v><xsl:value-of select="$s4" /></v></xsl:if>
+            <xsl:if test="string-length($s5) &gt; 0"><v><xsl:value-of select="$s5" /></v></xsl:if>
+            <xsl:if test="string-length($s6) &gt; 0"><v><xsl:value-of select="$s6" /></v></xsl:if>
+            <xsl:if test="string-length($s7) &gt; 0"><v><xsl:value-of select="$s7" /></v></xsl:if>
+        </values>
+    </xsl:variable>
+    <xsl:value-of select="string-join($values/values/v, $sep)" />
+  </xsl:function>
+  <xsl:function name="ois:delimit-list" as="xs:string">
+    <xsl:param name="sep" as="xs:string"/>
+    <xsl:param name="s1" as="xs:string"/>
+    <xsl:param name="s2" as="xs:string"/>
+    <xsl:param name="s3" as="xs:string?"/>
+    <xsl:param name="s4" as="xs:string?"/>
+    <xsl:param name="s5" as="xs:string?"/>
+    <xsl:param name="s6" as="xs:string?"/>
+    <xsl:value-of select="ois:delimit-list($sep,$s1,$s2,$s3,$s4,$s5,$s6,'')" />
+  </xsl:function>
+  <xsl:function name="ois:delimit-list" as="xs:string">
+    <xsl:param name="sep" as="xs:string"/>
+    <xsl:param name="s1" as="xs:string"/>
+    <xsl:param name="s2" as="xs:string"/>
+    <xsl:param name="s3" as="xs:string?"/>
+    <xsl:param name="s4" as="xs:string?"/>
+    <xsl:param name="s5" as="xs:string?"/>
+    <xsl:value-of select="ois:delimit-list($sep,$s1,$s2,$s3,$s4,$s5,'','')" />
+  </xsl:function>
+  <xsl:function name="ois:delimit-list" as="xs:string">
+    <xsl:param name="sep" as="xs:string"/>
+    <xsl:param name="s1" as="xs:string"/>
+    <xsl:param name="s2" as="xs:string"/>
+    <xsl:param name="s3" as="xs:string?"/>
+    <xsl:param name="s4" as="xs:string?"/>
+    <xsl:value-of select="ois:delimit-list($sep,$s1,$s2,$s3,$s4,'','','')" />
+  </xsl:function>
+  <xsl:function name="ois:delimit-list" as="xs:string">
+    <xsl:param name="sep" as="xs:string"/>
+    <xsl:param name="s1" as="xs:string"/>
+    <xsl:param name="s2" as="xs:string"/>
+    <xsl:param name="s3" as="xs:string?"/>
+    <xsl:value-of select="ois:delimit-list($sep,$s1,$s2,$s3,'','','','')" />
+  </xsl:function>
 
 </xsl:stylesheet>

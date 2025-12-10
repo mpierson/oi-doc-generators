@@ -62,7 +62,10 @@ function ConvertTo-XmlNode {
 		 {
 			$nodeAttrs = ""
 			foreach ($key in $Attributes.Keys) {
-				$nodeAttrs = $nodeAttrs + "$key=`"" + $Attributes[$key] + "`" "
+				# replace embedded double quotes
+				$attrValue = $Attributes[$key]
+				If ($attrValue) { $attrValue = $attrValue.ToString().Replace('"', '&quot;') }
+				$nodeAttrs = $nodeAttrs + "$key=`"" + $attrValue + "`" "
 			}
 			Write-Output "<$Name $nodeAttrs>"
 		 }
@@ -147,6 +150,33 @@ Write-Output "<Cluster>"
 	ConvertTo-XmlParentNode -Content $spsNodes -ParentName 'SessionAppliances' -ChildName 'SessionNode' -AttributeMapScript { @{'id' = $_.Id; 'name' = $_.SpsHostName } }
 Write-Output "</Cluster>"
 
+Get-SafeguardStarlingSubscription | ConvertTo-XmlNode -Name "StarlingSubscription"
+Invoke-Safeguardmethod  -Service core -Method GET -RelativeUrl "EmailClientConfig" -Accept 'application\json' | ConvertTo-XmlNode -Name "EmailClient"
+
+$syslogServers= Get-SafeguardSyslogServer
+ConvertTo-XmlParentNode -Content $syslogServers -ChildName "SyslogServer" -AttributeMapScript { @{'id' = $_.Id; 'name' = $_.Name; 'host' = $_.NetworkAddress; "protocol" = $_.Protocol } }
+
+$ticketSystems = Invoke-Safeguardmethod  -Service core -Method GET -RelativeUrl "TicketSystems" -Accept 'application\json' 
+ConvertTo-XmlParentNode -Content $ticketSystems -ChildName "TicketSystem" -AttributeMapScript { @{'id' = $_.Id; 'name' = $_.Name; 'type' = $_.TicketSystemType } }
+
+
+$licenses = Get-SafeguardLicense 
+ConvertTo-XmlParentNode -Content $licenses -ChildName "License" -AttributeMapScript { 
+		@{'key' = $_.Key; 'module' = $_.Module; 'isValid' = $_.IsValid; 'expires' = $_.Expires; "type" = $_.Type } 
+}
+
+$certificates = Get-SafeguardTrustedCertificate 
+ConvertTo-XmlParentNode -Content $certificates -ChildName "Certificate" -AttributeMapScript { 
+	@{'type'       = $_.Type; 
+	  'thumbprint' = $_.Thumbprint; 
+	  'subject'    = $_.Subject; 
+	  'issuedBy'   = $_.IssuedBy; 
+	  'notBefore'  = $_.NotBefore; 
+	  'notAfter'   = $_.NotAfter;
+	  'isSystemOwned' = $_.IsSystemOwned;
+	}	  
+}
+
 
 $servers = Get-SafeguardArchiveServer
 ConvertTo-XmlParentNode -Content $servers -ChildName 'ArchiveServer' -AttributeMapScript { @{'id' = $_.Id; 'name' = $_.Name; 'networkAddress' = $_.NetworkAddress } }
@@ -160,6 +190,9 @@ ConvertTo-XmlParentNode -Content $settings -ParentName 'ApplianceSettings' -Chil
 
 Get-SafeguardPurgeSettings |ConvertTo-XmlNode -Name 'PurgeSettings'
 
+$IProviders = Get-SafeguardIdentityProvider
+ConvertTo-XmlParentNode -Content $IProviders -ChildName 'IdentityProvider' -AttributeMapScript { @{'id' = $_.Id; 'name' = $_.Name; 'type' = $_.TypeReferenceName } }
+
 $providers = Get-SafeguardAuthenticationProvider
 ConvertTo-XmlParentNode -Content $providers -ChildName 'AuthProvider' -AttributeMapScript { @{'id' = $_.Id; 'name' = $_.Name; 'type' = $_.TypeReferenceName } }
 
@@ -171,6 +204,40 @@ $admins = $allUsers | Where-Object {
 ConvertTo-XmlParentNode -Content $admins -ChildName 'Administrator' `
 		-AttributeMapScript { @{'id' = $_.Id; 'name' = $_.Name; 'adminRoles' = ($_.AdminRoles -join ',') } }
 
+ConvertTo-XmlParentNode -Content $allUsers -ChildName 'User' `
+		-AttributeMapScript { @{'id' = $_.Id; 'name' = $_.Name;  } } `
+		-ChildContentScript {
+					$linkedAccounts = Get-SafeguardUserLinkedAccount $_.Id
+					ConvertTo-XmlParentNode -Content $linkedAccounts -ChildName 'LinkedAccount' `
+						-AttributeMapScript { 
+							@{'name' = $_.Name; 
+							  'id' = $_.Id;
+							  'assetName' = $_.Asset.Name;
+							  'assetId' = $_.Asset.Id;
+							  'partitionId' = $_.Asset.AssetPartitionId;
+							} 
+						}
+				}
+
+# to make it easy on parsers, include list of linked accounts
+Write-Output "<LinkedAccounts>"
+$linkedUsers = $allUsers | Where-Object { $_.LinkedAccountsCount -gt 0 }
+$linkedUsers | ForEach-Object {
+	$accountOwner = $_
+	$accounts = Get-SafeguardUserLinkedAccount $_.Id 
+	$accounts | ForEach-Object {
+		$attrs = @{'name' = $_.Name; 
+				   'id' = $_.Id;
+				   'assetName' = $_.Asset.Name;
+				   'assetId' = $_.Asset.Id;
+				   'partitionId' = $_.Asset.AssetPartitionId;
+				   'ownerId' = $accountOwner.Id;
+				   'ownerName' = $accountOwner.Name;
+		}
+		$_ | ConvertTo-XmlNode -Name "LinkedAccount" -Attributes $attrs		
+	}
+}
+Write-Output "</LinkedAccounts>"
 
 
 Write-Output "<Partitions>"

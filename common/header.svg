@@ -1,0 +1,71 @@
+<svg height=0 width=0><style>
+text {
+  font-family: Verdana, sans-serif;                                                                               
+  font-size: 8pt;
+  line-height: 1.6;
+  color: #444444;
+  background-color: white;
+}
+
+path {
+ stroke: #04aada;
+ stroke-width: 2;
+}
+
+path.left-arrow {
+ stroke-width: 2;
+ marker-end: url(#end-arrow-sharp);
+}
+path.right-arrow {
+ stroke-width: 2;
+ marker-start: url(#start-arrow-sharp);
+}
+path.arrows {
+ stroke-width: 2;
+ marker-start: url(#start-arrow-sharp);
+ marker-end: url(#end-arrow-sharp);
+}
+
+path.dashes {
+ stroke-width: 2;
+ stroke-dasharray: 10,5;
+}
+
+path.gray {
+ stroke-width: 2;
+ stroke: #cad4d7;
+}
+
+path.key-column {
+ stroke-width: 3;
+ marker-start: url(#start-arrow-sharp);
+ marker-end: url(#end-arrow-sharp);
+}
+
+
+
+.timeline-line { stroke: #77c8b3; stroke-width: 3; }
+.date-marker { stroke: #77c8b3; stroke-width: 2; }
+.date-label { font-family: Arial, sans-serif; font-size: 8px; fill: #77c8b3; font-weight: bold; }
+.event-marker { stroke: #82a7c5; stroke-width: 4; }
+.marker-label { font-family: Arial, sans-serif; font-size: 8px; fill: #00969f; font-weight: bold; }
+
+
+</style>
+<defs>
+<marker id='arrow-head' orient="auto" markerWidth='10' markerHeight='4' refX='6' refY='2' markerUnits="strokeWidth" stroke="context-stroke" stroke-width="1" >
+    <path d='M8,0 V4 L4,2 Z' />
+</marker>
+<marker id='arrow-tail' orient="auto" markerWidth='5' markerHeight='4' refX='0.1' refY='2' >
+    <path d='M0,0 V4 L4,2 Z' />
+</marker>
+<defs>
+    <marker id="start-arrow-sharp" markerWidth="5" markerHeight="5" refX="3" refY="2.5" viewBox="0 0 5 5" orient="auto-start-reverse">
+        <polygon points="0,5 2,2.5 0,0 5,2.5" fill="context-stroke"></polygon>
+    </marker>
+    <marker id="end-arrow-sharp" markerWidth="5" markerHeight="5" refX="2.5" refY="2.5" viewBox="0 0 5 5" orient="auto">
+        <polygon points="0,5 2,2.5 0,0 5,2.5" fill="context-stroke"></polygon>
+    </marker>
+</defs>
+</defs>
+</svg> 

@@ -1,0 +1,191 @@
+@startuml
+
+!theme C4_OneIdentity from /home/mpierson/.config/plantuml/
+!include /home/mpierson/.config/plantuml/ICON_SPP.sprite
+!include /home/mpierson/.config/plantuml/ICON_SPS.sprite
+!include /home/mpierson/.config/plantuml/ICON_Starling.sprite
+!include /home/mpierson/.config/plantuml/ICON_Syslog.sprite
+!include /home/mpierson/.config/plantuml/ICON_OneIM.sprite
+!include /home/mpierson/.config/plantuml/vsphere.sprite
+!include /home/mpierson/.config/plantuml/IBM.sprite
+!include /home/mpierson/.config/plantuml/Splunk.sprite
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+!define FONTAWESOME https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/font-awesome-5
+!include FONTAWESOME/user.puml
+!include FONTAWESOME/users.puml
+!include FONTAWESOME/user_lock.puml
+!include FONTAWESOME/server.puml
+!include FONTAWESOME/cogs.puml
+!include FONTAWESOME/lock_open.puml
+!include FONTAWESOME/ticket_alt.puml
+!include FONTAWESOME/calendar_check.puml
+!include FONTAWESOME/calendar_plus.puml
+!include FONTAWESOME/calendar_day.puml
+!include FONTAWESOME/clipboard_list.puml
+!include FONTAWESOME/sliders_h.puml
+!include FONTAWESOME/binoculars.puml
+!include FONTAWESOME/search.puml
+
+!define DEVICONS https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/devicons
+!include DEVICONS/linux.puml
+!include DEVICONS/windows.puml
+!include DEVICONS/cisco.puml
+
+!define OFFURL https://raw.githubusercontent.com/Roemer/plantuml-office/master/office2014
+!include OFFURL/Servers/database_server.puml
+!include OFFURL/Servers/cluster_server.puml
+!include OFFURL/Servers/server_generic.puml
+!include OFFURL/Servers/file_server.puml
+!include OFFURL/Services/email_service.puml
+!include OFFURL/Users/universal_security_group.puml
+!include OFFURL/Security/policy.puml
+!include OFFURL/Security/role_assignment_policy.puml
+!include OFFURL/Security/active_directory.puml
+!include OFFURL/Clouds/azure.puml
+
+
+
+!define AzurePuml https://raw.githubusercontent.com/plantuml-stdlib/Azure-PlantUML/master/dist
+!includeurl AzurePuml/AzureCommon.puml
+!includeurl AzurePuml/Databases/AzureCosmosDb.puml
+!includeurl AzurePuml/Compute/AzureFunction.puml
+!includeurl AzurePuml/Identity/AzureActiveDirectory.puml
+
+!include <material7.4.47/BrandLogo/MicrosoftDynamics365>
+
+
+
+HIDE_STEREOTYPE()
+
+UpdateSystemBoundaryStyle($bgColor="white")
+UpdateRelStyle($COLOR_OI_BLACK, $COLOR_OI_LOBLOLLY)
+
+
+AddRelTag("hidden", $lineColor="white", $textColor="white")
+AddRelTag("light", $lineColor="LightGrey", $textColor="LightGrey")
+
+AddBoundaryTag("OI_System", $bgColor="white", $fontColor="$COLOR_OI_GRAY")
+
+AddComponentTag("SG_Admin", $bgColor=$COLOR_OI_LIGHT_BLUE, $fontColor=white,  $sprite="user,scale=0.6")
+AddComponentTag("SG_User", $bgColor=$COLOR_OI_BROWN, $borderColor="$COLOR_OI_BLACK", $fontColor=white,  $sprite="user,scale=0.6")
+AddComponentTag("SG_UserGroup", $bgColor=$COLOR_OI_ORANGE, $fontColor=white, $sprite="users,scale=0.7")
+AddComponentTag("SG_Entitlement", $bgColor=$COLOR_OI_RED, $fontColor=white, $sprite="policy,scale=0.7")
+AddComponentTag("SG_RequestPolicy", $bgColor="$COLOR_OI_BROWN", $borderColor="$COLOR_OI_BLACK", $sprite="role_assignment_policy,scale=0.7")
+AddComponentTag("SG_Account", $bgColor=$COLOR_OI_ORANGE, $borderColor="$COLOR_OI_BLACK", $fontColor="white", $sprite="user_lock,scale=0.7,color=white")
+AddComponentTag("SG_AccountGroup", $bgColor=$COLOR_OI_BROWN, $fontColor="white", $sprite="universal_security_group,scale=0.7,color=white")
+AddComponentTag("SG_Asset", $bgColor=$COLOR_OI_ORANGE, $borderColor="$COLOR_OI_BLACK", $fontColor="white", $sprite="server_generic,scale=0.7,color=white")
+AddComponentTag("SG_AssetGroup", $bgColor=$COLOR_OI_GREEN, $fontColor="white", $sprite="cluster_server,scale=0.7,color=white")
+AddComponentTag("SG_Tag", $bgColor=$COLOR_OI_GRAY, $fontColor="white")
+
+AddComponentTag("SG_SPP", $bgColor=$COLOR_OI_BLUE, $sprite="ICON_SPP,scale=0.5,color=white", $fontColor="white")
+AddComponentTag("SG_SPS", $bgColor=$COLOR_OI_BLUE, $sprite="ICON_SPS,scale=0.5,color=white", $fontColor="white")
+AddComponentTag("SG_Starling", $bgColor=$COLOR_OI_BLUE, $sprite="ICON_Starling,scale=0.25,color=white", $fontColor="white")
+AddComponentTag("SG_Syslog", $bgColor=$COLOR_OI_BLUE, $sprite="ICON_Syslog,scale=0.3,color=white", $fontColor="white")
+
+AddComponentTag("INTEGRATION", $bgColor=$COLOR_OI_BROWN, $fontColor=white)
+
+AddComponentTag("AUTH_ActiveDirectory", $bgColor=$COLOR_OI_GREEN, $fontColor=white, $sprite="active_directory,scale=0.7,color=white")
+AddComponentTag("ARCH_CIFS", $bgColor=$COLOR_OI_BROWN, $fontColor=white, $sprite="file_server,scale=0.7,color=white")
+
+
+AddComponentTag("PF_MicrosoftAD", $bgColor=$COLOR_OI_GREEN, $fontColor=white, $sprite="active_directory,scale=0.7,color=white")
+AddComponentTag("PF_Linux", $bgColor=$COLOR_OI_ORANGE, $fontColor="white", $sprite="linux,scale=0.7,color=white")
+AddComponentTag("PF_Windows", $bgColor=$COLOR_OI_ORANGE, $fontColor="white", $sprite="windows,scale=0.7,color=white")
+AddComponentTag("PF_Cisco", $bgColor=$COLOR_OI_ORANGE, $fontColor="white", $sprite="cisco,scale=0.8,color=white")
+AddComponentTag("PF_vSphere", $bgColor=$COLOR_OI_ORANGE, $fontColor="white", $sprite="vsphere,scale=0.8,color=white")
+AddComponentTag("PF_IBM", $bgColor=$COLOR_OI_ORANGE, $fontColor="white", $sprite="IBM,scale=0.07,color=white")
+AddComponentTag("PF_None", $bgColor=$COLOR_OI_ORANGE, $fontColor="white", $sprite="server_generic,scale=0.7,color=white")
+
+AddComponentTag("SG_PasswordProfile", $bgColor=$COLOR_OI_BROWN, $fontColor="white", $sprite="policy,scale=0.7")
+AddComponentTag("SG_PasswordCheck", $bgColor=$COLOR_OI_BROWN, $fontColor="white", $sprite="calendar_check,scale=0.7")
+AddComponentTag("SG_PasswordChange", $bgColor=$COLOR_OI_RED, $fontColor="white", $sprite="calendar_plus,scale=0.7")
+AddComponentTag("SG_PasswordRule", $bgColor=$COLOR_OI_PINK, $fontColor="white", $sprite="sliders_h,scale=0.7")
+
+AddComponentTag("SG_AssetDiscoveryJob", $bgColor=$COLOR_OI_BROWN, $fontColor="white", $sprite="calendar_day,scale=0.7")
+AddComponentTag("SG_AssetDiscoveryRule", $bgColor=$COLOR_OI_PINK, $fontColor="white", $sprite="binoculars,scale=0.7")
+AddComponentTag("SG_AccountDiscoveryRule", $bgColor=$COLOR_OI_LIGHT_BLUE, $fontColor="white", $sprite="search,scale=0.7")
+
+AddComponentTag("OneIM_DB", $bgColor=$COLOR_OI_BLUE, $fontColor="white", $borderColor="$COLOR_OI_GRAY"  )
+AddComponentTag("OneIM_JS", $bgColor=$COLOR_OI_BROWN, $fontColor="white" )
+AddComponentTag("OneIM_JQ", $bgColor=$COLOR_OI_BROWN, $fontColor="white", $borderColor="$COLOR_OI_GRAY" )
+AddComponentTag("OneIM_AS", $bgColor=$COLOR_OI_GREEN, $fontColor="white" )
+AddComponentTag("OneIM_AP", $bgColor=$COLOR_OI_GREEN, $fontColor="white" )
+AddComponentTag("OneIM_TS", $bgColor=$COLOR_OI_ORANGE, $fontColor="white" )
+AddComponentTag("OneIM_TSParent", $bgColor=$COLOR_OI_ORANGE, $fontColor="LightGrey" )
+AddComponentTag("OneIM_SYNC", $bgColor=$COLOR_OI_LIGHT_BLUE, $fontColor="white" )
+AddComponentTag("OneIM_WDProject",          $bgColor=$COLOR_OI_BLUE,        $fontColor="white" )
+AddComponentTag("OneIM_WDModule",           $bgColor=$COLOR_OI_GREEN,       $fontColor="white" )
+AddComponentTag("OneIM_WDComponent",        $bgColor=$COLOR_OI_ORANGE,      $fontColor="white" )
+AddComponentTag("OneIM_WDMenuStructure",    $bgColor=$COLOR_OI_ORANGE,      $fontColor="gray" )
+AddComponentTag("OneIM_WDMenu",             $bgColor=$COLOR_OI_ORANGE,      $fontColor="white" )
+AddComponentTag("OneIM_WDTable",            $bgColor=$COLOR_OI_LIGHT_BLUE,  $fontColor="white" )
+AddComponentTag("OneIM_WDForm",             $bgColor=$COLOR_OI_ORANGE,      $fontColor="white" )
+AddComponentTag("OneIM_WDFunction",         $bgColor=$COLOR_OI_BROWN,       $fontColor="white" )
+AddComponentTag("OneIM_WDControl",          $bgColor=$COLOR_OI_PINK,        $fontColor="white" )
+AddComponentTag("OneIM_WDDataEventHandler", $bgColor=$COLOR_OI_RED,         $fontColor="white" )
+AddComponentTag("OneIM_WDDataEventColumn",  $bgColor=$COLOR_OI_BLUE,        $fontColor="white" )
+AddComponentTag("OneIM_WDModuleParameter",  $bgColor=$COLOR_OI_YELLOW,      $fontColor=$COLOR_OI_GRAY)
+
+AddComponentTag("OneIM_WDVirtualTable",     $bgColor=$COLOR_OI_DARK_GREEN,  $fontColor="white" )
+AddComponentTag("OneIM_WDVirtualFunction",  $bgColor=$COLOR_OI_DARK_GREEN,  $fontColor="white" )
+AddComponentTag("OneIM_WDVirtualControl",   $bgColor=$COLOR_OI_DARK_GREEN,  $fontColor="white" )
+
+AddComponentTag("OneIM_WDComponentInterface",       $bgColor=$COLOR_OI_DARK_GREEN, $fontColor="white", $borderColor="$COLOR_OI_GRAY", $borderStyle="Dashed")
+AddComponentTag("OneIM_WDVirtualTableExtension",    $bgColor=$COLOR_OI_LIGHT_BLUE, $fontColor=$COLOR_OI_GRAY, $borderColor="$COLOR_OI_GRAY", $borderStyle="Dashed")
+
+AddBoundaryTag("OneIM_Approval",  $fontColor=$COLOR_OI_GRAY, $borderColor="$COLOR_OI_GRAY", $borderStyle="Dashed")
+AddContainerTag("OneIM_Approval", $fontColor=$COLOR_OI_GRAY, $borderColor="$COLOR_OI_GRAY", $borderStyle="Dashed")
+AddComponentTag("OneIM_Approver", $bgColor=$COLOR_OI_MONTE_CARLO, $fontColor=$COLOR_OI_GRAY, $borderColor="$COLOR_OI_GRAY", $borderStyle="Solid")
+AddComponentTag("OneIM_Approver_CD", $bgColor=$COLOR_OI_NEPAL, $fontColor=$COLOR_OI_GRAY, $borderColor="$COLOR_OI_GRAY", $borderStyle="Solid")
+AddComponentTag("OneIM_Approver_EX", $bgColor=$COLOR_OI_JAFFA, $fontColor=$COLOR_OI_GRAY, $borderColor="$COLOR_OI_GRAY", $borderStyle="Solid")
+AddRelTag(OneIM_Approval, $textColor="$COLOR_OI_GRAY", $lineColor="$COLOR_OI_BLUE_LAGOON")
+AddRelTag(OneIM_Denial, $textColor="$COLOR_OI_GRAY", $lineColor="$COLOR_OI_ORANGE")
+AddRelTag(OneIM_Escalation, $textColor="$COLOR_OI_GRAY", $lineColor="$COLOR_OI_PEAR")
+
+AddSystemTag("OneIM", $bgColor=$COLOR_OI_BLUE, $fontColor="white", $borderColor="$COLOR_OI_GRAY", $sprite="ICON_OneIM,scale=0.6,color=white"  )
+AddSystemTag("OneIM_TS_MicrosoftAD", $bgColor="#00A4EF", $fontColor=white, $sprite="active_directory,scale=0.7,color=white")
+AddSystemTag("OneLogin", $bgColor=$COLOR_OI_BLUE, $fontColor="white", $borderColor="$COLOR_OI_GRAY", $sprite="ICON_OneIM,scale=0.6,color=white"  )
+AddSystemTag("OneIM_HR", $bgColor="$COLOR_OI_BLUE_LAGOON", $fontColor=white, $sprite="active_directory,scale=0.7,color=white")
+AddSystemTag("OneIM_TS_Generic", $bgColor="$COLOR_OI_BLUE_LAGOON", $fontColor=white )
+
+AddComponentTag("OneIM_SystemConnection", $bgColor=$COLOR_OI_JAFFA, $fontColor="white" )
+AddComponentTag("OneIM_SchemaClass", $bgColor=$COLOR_OI_JACARTA, $fontColor="white" )
+
+AddComponentTag("OneIM_Job", $bgColor=$COLOR_OI_JAFFA, $fontColor="white" )
+AddRelTag(OneIM_JobSuccess, $textColor="$COLOR_OI_GRAY", $lineColor="$COLOR_OI_BLUE_LAGOON")
+AddRelTag(OneIM_JobError, $textColor="$COLOR_OI_GRAY", $lineColor="$COLOR_OI_ORANGE")
+AddRelTag(OneIM_JobSplit, $textColor="$COLOR_OI_GRAY", $lineColor="$COLOR_OI_PEAR")
+
+
+AddComponentTag("OneIM_Deploy_DB", $bgColor=$COLOR_OI_JAFFA, $fontColor="white", $borderColor="$COLOR_OI_GRAY" , $sprite="database_server,scale=0.6,color=white"  )
+AddComponentTag("OneIM_Deploy_JS", $bgColor=$COLOR_OI_NEPAL, $fontColor="white" , $sprite="ICON_OneIM,scale=0.4,color=white" )
+AddComponentTag("OneIM_Deploy_WS", $bgColor=$COLOR_OI_MONTE_CARLO, $fontColor="white" , $sprite="ICON_OneIM,scale=0.4,color=white" )
+AddComponentTag("OneIM_Deploy_AS", $bgColor=$COLOR_OI_BLUE_LAGOON, $fontColor="white" , $sprite="ICON_OneIM,scale=0.4,color=white" )
+AddComponentTag("OneIM_Deploy_Tools", $bgColor=$COLOR_OI_LOBLOLLY, $fontColor="white" , $sprite="ICON_OneIM,scale=0.4,color=white" )
+
+AddComponentTag("SG_Deploy_SPP", $bgColor=$COLOR_OI_MONTE_CARLO, $fontColor="white" , $sprite="ICON_SPP,scale=0.4,color=white" )
+AddComponentTag("SG_Deploy_SPS", $bgColor=$COLOR_OI_NEPAL, $fontColor="white" , $sprite="ICON_SPS,scale=0.4,color=white" )
+
+AddComponentTag("StarlingConnect_Connector", $bgColor=$COLOR_OI_BLUE, $fontColor="white" , $sprite="ICON_Starling,scale=0.4,color=white" )
+
+AddComponentTag("Deploy_ActiveDirectory", $bgColor="#0078D4", $fontColor=white, $sprite="active_directory,scale=0.7,color=white")
+AddComponentTag("Deploy_Azure", $bgColor="#0078D4", $fontColor=white, $sprite="azure,scale=0.7,color=white")
+AddComponentTag("Deploy_AzureActiveDirectory", $bgColor="#0078D4", $fontColor=white, $sprite="AzureActiveDirectory,scale=0.7,color=white")
+AddComponentTag("Deploy_AzureD365", $bgColor="#0078D4", $fontColor=white, $sprite="mdiMicrosoftDynamics365,scale=0.7,color=white")
+
+AddComponentTag("Deploy_API", $bgColor="#0078D4", $fontColor=white, $sprite="cogs,scale=0.7,color=white")
+
+AddComponentTag("Deploy_Workday", $bgColor="#0F2E66", $fontColor=white, $sprite="cogs,scale=0.7,color=white")
+AddComponentTag("Deploy_Splunk", $bgColor="#0C1724", $fontColor=white, $sprite="ICON_Splunk,scale=0.3,color=white")
+
+AddNodeTag("Deploy_Area",$bgColor=white, $fontColor=$COLOR_OI_GRAY)
+AddNodeTag("Deploy_SubArea",$bgColor="#EDEDED", $fontColor=$COLOR_OI_GRAY)
+AddNodeTag("Deploy_Infrastructure",$bgColor=$COLOR_OI_GRAY, $fontColor=white)
+ 
+
+
+@enduml
