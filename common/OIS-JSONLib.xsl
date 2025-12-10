@@ -26,6 +26,19 @@
 </xsl:analyze-string>
 </xsl:template>
 
+<xsl:function name="ois:json-get-value" as="xs:string">                                                          
+     <xsl:param name="json" />
+     <xsl:param name="key" />
+
+     <!-- look for "key": value, where value may be quoted, and may be followed by delimiters '}' or ',' -->
+     <xsl:variable name="regex"><xsl:value-of select="$key" />&quot;: &quot;?([^&quot;}]*?)[&quot;,\}]</xsl:variable>
+    <xsl:variable name="content">
+        <xsl:analyze-string select="$json" regex="{$regex}">
+            <xsl:matching-substring><xsl:value-of select="regex-group(1)" /></xsl:matching-substring>
+        </xsl:analyze-string>
+    </xsl:variable>
+    <xsl:value-of select="$content" />
+</xsl:function>
 
 
 </xsl:stylesheet>

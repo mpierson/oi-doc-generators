@@ -75,6 +75,7 @@
       <xsl:param name="header" />
       <xsl:param name="separator" />
       <xsl:param name="values" />
+      <xsl:param name="empty-message" />
       <xsl:param name="max-size" as="xs:integer?" select="-1" />
       <xsl:variable name="size-limit" select="if ( $max-size &gt; 0 ) then $max-size else  count($values/rows/row)" />
 
@@ -89,6 +90,10 @@ Table: </xsl:text><xsl:value-of select="$summary"/> {#tbl:<xsl:value-of select="
 </xsl:text><xsl:value-of select="normalize-space($separator)" />
 <xsl:apply-templates select="$values/rows/row[position() &lt;= $size-limit]" mode="table" />
   </xsl:if>
+  <xsl:if test="count($values/rows/row) = 0">
+      <xsl:text>
+</xsl:text><xsl:value-of select="$empty-message" />
+</xsl:if>
   </xsl:template>
   <xsl:template match="row" mode="table">
       <xsl:text>

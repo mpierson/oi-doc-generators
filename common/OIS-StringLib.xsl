@@ -69,6 +69,16 @@
 
   </xsl:function>
 
+  <!-- Function to return string if node is enabled -->
+  <xsl:function name="ois:enabled-node-label" as="xs:string">
+    <xsl:param name="node"/>
+    <xsl:param name="label" as="xs:string?"/>
+    <xsl:value-of select="if ( lower-case($node/@enabled) = 'yes' or lower-case($node/@enabled) = 'true' ) then
+                            $label
+                          else ''
+    "/>
+  </xsl:function>
+
 
 
   <!-- Return True or False based on boolean -->
@@ -138,6 +148,32 @@
            </value>
        </xsl:if>
   </xsl:template>
+
+
+  <!-- Render list as delimited string
+    Expect listcontent like:
+    <items><value>...</value>...</items> 
+  -->
+  <xsl:function name="ois:list-to-string" as="xs:string">
+    <xsl:param name="l" />
+    <xsl:param name="separator" as="xs:string"/>
+    <xsl:variable name="result">
+        <xsl:if test="count($l/items/value) &gt; 0">
+            <values>
+                <xsl:apply-templates select="$l/items/value" mode="simple-list" />
+            </values>
+      </xsl:if>
+    </xsl:variable>
+    <xsl:value-of select="$result/values/value" separator="{$separator}" />
+                <!-- <xsl:value-of select="$result" separator="{$separator}" /> -->
+
+  </xsl:function>
+   <xsl:template match="value" mode="simple-list">
+       <xsl:if test="string-length(.) &gt; 0">
+           <value> <xsl:value-of select="." /> </value>
+       </xsl:if>
+  </xsl:template>
+
 
 
 

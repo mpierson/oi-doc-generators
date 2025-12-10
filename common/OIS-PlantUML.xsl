@@ -279,5 +279,19 @@ scale 1.5
    <xsl:value-of select="ois:c4-rel-common('BiRel', $id-left, $id-right, $description, $tag)" />
 </xsl:function>
 
+<xsl:function name="ois:puml-component" as="xs:string">
+    <xsl:param name="id"            as="xs:string"/>
+    <xsl:param name="label"         as="xs:string"/>
+    <xsl:param name="description"   as="xs:string"/>
+    <xsl:param name="tags"          as="xs:string"/>
+    <xsl:value-of select="concat(
+            '&#10;Component(', 
+                $id, ', ',
+                '&quot;', $label, '&quot;, ', 
+                '&quot;', $description, '&quot;, ', 
+                '$tags=&quot;', $tags, '&quot;', 
+            ')'
+    )" />
+</xsl:function>
 
 </xsl:stylesheet>
