@@ -162,13 +162,15 @@ OIS_GetDateTimeWFn <- function(type){
 # for given run date, return closest future date according to sched
 OIS_GetNextStartTime <- function(frequency, sub_freq, time_of_day, offset, fn_r, fn_w, nr) {
 
-#  parsed_time = anytime(nr)
-  parsed_time = mdy_hms(nr, tz="UTC")
+  parsed_time = anytime(nr)
+  #parsed_time = mdy_hms(nr, tz="UTC")
   # add UTC offset (seconds)
-  parsed_time = parsed_time + strtoi(offset, 10)
+  #parsed_time = parsed_time + strtoi(offset, 10)
 
   tod = time_of_day
-  if (is.null(tod) ) { tod = "0:0" }
+  if (is.na(tod) | is_null(tod)) { 
+      tod = "00:00" 
+  } 
   
   h = strtoi(unlist(strsplit(tod, ":"))[1], 10)
   parsed_time = parsed_time - hours(hour(parsed_time)) + h*60*60
@@ -178,7 +180,7 @@ OIS_GetNextStartTime <- function(frequency, sub_freq, time_of_day, offset, fn_r,
   next_run = parsed_time - days(fn_r(parsed_time)) + days(sub_freq)
   today = now()
 
-    if ( next_run > today ) {
+  if ( next_run > today ) {
     return(next_run)
   }
   else

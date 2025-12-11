@@ -50,7 +50,7 @@
     <xsl:for-each select="tokenize($s, $newline)"><xsl:text>` </xsl:text><xsl:sequence select="."/><xsl:text> ` </xsl:text><br /></xsl:for-each>
   </xsl:template>
 
-<xsl:template match="WebDesigner">
+<xsl:template match="IdentityManager">
 
 ---
 title: One Identity Manager Web Designer Configuration for <xsl:value-of select="@name" /> 
@@ -61,13 +61,10 @@ abstract: |
 
 
 
-# Summary
-
 
 # Projects
 
 <xsl:apply-templates select="WDProjects" />
-
 
 # Modules
 
@@ -1312,7 +1309,7 @@ Boundary(main, "Web Designer", $tags="OI_System") {
 
 <xsl:function name="ois:is-custom-object" as="xs:boolean">
     <xsl:param name="node" />
-    <xsl:value-of select="starts-with($node/@name, 'CCC') or starts-with($node/@name, 'HHS') or count($node/CustomConfiguration/WebDesigner/ConfigurationRoot/Extensions/*) &gt; 0" />
+    <xsl:sequence select="starts-with($node/@name, 'CCC') or starts-with($node/@name, 'HHS') or count($node/CustomConfiguration/WebDesigner/ConfigurationRoot/Extensions/*) &gt; 0" />
 </xsl:function> 
 
  <!-- extract function name, sans params -->
