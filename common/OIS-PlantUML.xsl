@@ -125,7 +125,7 @@ scale 1.5
 
     <xsl:if test="string-length($content) &gt; 0">
       <xsl:value-of select="concat('&#xa;&#xa;```{.plantuml caption=&quot;', $summary, '&quot;}')" />
-      <xsl:text>&#xa;&#xa;!include_many /home/mpierson/projects/quest/OneIM/posh-exporter/header.puml&#xa;&#xa;</xsl:text>
+      <xsl:text>&#xa;&#xa;!include_many header.puml&#xa;&#xa;</xsl:text>
       <xsl:copy-of select="$content" />
       <xsl:text>&#xa;&#xa;```&#xa;&#xa;</xsl:text>
       <xsl:value-of select="concat('&#xa;&#xa;![', $summary, '](single.png){#fig:', $id, '}&#xa;&#xa;')" />
