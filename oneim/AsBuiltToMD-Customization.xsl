@@ -5,7 +5,7 @@
 
   Author: M Pierson
   Date: Mar 2025
-  Version: 0.90
+  Version: 0.91
 
   Use /opt/scb/var/db/scb.xml, or extract config from export/bundle.
 
@@ -43,7 +43,7 @@
 
 ---
 title: One Identity Manager Customization Report for <xsl:value-of select="@name" /> 
-author: OneIM As Built Generator v0.90
+author: OneIM As Built Generator v0.91
 abstract: |
     Schema customizations of the <xsl:value-of select="@name" /> instance, generated <xsl:value-of select="format-dateTime(current-dateTime(), '[Y0001]-[M01]-[D01]')" />.
 ---
@@ -327,6 +327,7 @@ abstract: |
     df = data.frame(col = character(), col = character(), col = numeric(), col = numeric(), col = character(), col = character(), col = character(), col = character(), col = character(), col = character(), stringsAsFactors = FALSE)
     names(df) &lt;- c("Id", "Type", "Freq", "SubFreq", "TimeOfDay", "Offset", "ShortName", "StartDate", "LastRun", "NextRun")
 
+    #  <xsl:value-of select="$figure-description" />
     s &lt;- df %&gt;%
     <xsl:value-of select="$df-rows" />
     {}
