@@ -1276,7 +1276,7 @@ Table: Summary of custom role classes {#tbl:summary-role-classes}
 
 <xsl:template match="Role|ApplicationRole|Department|Location|CostCenter" mode="section" >
 
-    <xsl:value-of select="ois:markdown-heading-3(@fullPath)" />
+    <xsl:value-of select="ois:markdown-heading-3(ois:is-null-string(@fullPath, '[name or path missing]'))" />
 
     <xsl:value-of select="ois:markdown-definition('Description', child::*/Property[@Field='Description'])" />
     <xsl:value-of select="ois:markdown-definition('Manager', Manager/@name)" />
