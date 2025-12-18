@@ -1071,6 +1071,7 @@ Table: Summary of custom scripts {#tbl:summary-scripts}
                 </xsl:apply-templates>
             </rows>
         </xsl:with-param>
+        <xsl:with-param name="max-size" select="20" />
     </xsl:call-template>
 
     <xsl:call-template name="ois:generate-table">
@@ -1085,6 +1086,7 @@ Table: Summary of custom scripts {#tbl:summary-scripts}
                 </xsl:apply-templates>
             </rows>
         </xsl:with-param>
+        <xsl:with-param name="max-size" select="20" />
     </xsl:call-template>
 
     </xsl:template>
@@ -1105,6 +1107,7 @@ Table: Summary of custom scripts {#tbl:summary-scripts}
     <xsl:template match="TaggedChange|TaggedItem" mode="event">
         <event>
             <xsl:attribute name="date" select="substring(@XDateInserted, 1, 10)" />
+            <xsl:attribute name="user" select="@XUserInserted" />
             <xsl:value-of select="concat(Object/@name , Object/@scriptName , Object/@columnName , Object/@tableName)" />
         </event>
     </xsl:template>
