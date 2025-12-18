@@ -167,7 +167,7 @@
     <!-- 
         timeline from 
         <events>
-            <event date="yyyy-mm-dd">description</event>
+            <event date="yyyy-mm-dd" user="jbloggs">description</event>
             ...
         </events>
     -->
@@ -243,6 +243,7 @@
             <xsl:attribute name="d" select="xs:date(@date)" />
             <xsl:attribute name="ndate" select="translate(@date, '-', '')" />
             <xsl:attribute name="label" select="text()" />
+            <xsl:attribute name="user" select="@user" />
         </e>
     </xsl:template>
 
@@ -336,7 +337,7 @@
                     <xsl:attribute name="endDate" select="$e-end" />
                     <xsl:attribute name="totalDays" select="days-from-duration($e-end - $e-start)" />
                     <xsl:attribute name="pixelsPerDay" select="$line-length div days-from-duration($e-end - $e-start) " />
-                    <!-- graphical content -->
+                    <!-- SVG content -->
                     <xsl:value-of select="concat($axis, $date-markers)" />
                 </axis>
             </xsl:otherwise>
@@ -381,18 +382,48 @@
 
         <xsl:variable name="text-gap" as="xs:integer" select="3" />
 
+        <xsl:variable name="user-count" as="xs:integer" select="count(distinct-values($events/@user))" />
+        <xsl:variable name="line-class" select="if ($user-count gt 1) then 'event-marker-3' else 'event-marker'" />
+
         <!-- position of marker, expressed as fraction of total axis length -->
         <xsl:variable name="x" select="
             $axis/@startPos + days-from-duration($date - xs:date($axis/@startDate)) * $axis/@pixelsPerDay
         " />
         <!-- height of marker, relative to max size and height -->
-        <xsl:variable name="h" select="count($events) div $max-size * $max-height" />
+        <xsl:variable name="h" as="xs:double" select="count($events) div $max-size * $max-height" />
 
+        <!--
         <xsl:variable name="line" select="
                 ois:svg-line($x, $x, 
                     $axis/@yPos, $axis/@yPos - $h, 
-                    ois:svg-attr('class', 'event-marker'))
+                    ois:svg-attr('class', $line-class))
         " />
+        -->
+        <xsl:variable name="line" select="ois:svg-one-event-marker($x, $axis/@yPos, $h, $line-class, 'xxx')" />
+
+        <!-- process events for current date, group by user -->
+        <xsl:variable name="user-events">
+            <ues>
+                <xsl:for-each-group select="$events" group-by="@user">
+                    <xsl:sort select="count(current-group())" order="descending"/>
+                    <ue>
+                        <xsl:attribute name="user" select="current-grouping-key()" />
+                        <xsl:attribute name="size" select="count(current-group())" />
+                    </ue>
+                </xsl:for-each-group>
+            </ues>
+        </xsl:variable>
+        <xsl:variable name="combo-line">
+            <xsl:apply-templates select="$user-events/ues/ue[1]" mode="user-event-marker">
+                <xsl:sort select="@size" order="descending"/>
+                <xsl:with-param name="index" as="xs:integer" select="1" />
+                <xsl:with-param name="x" as="xs:double" select="$x" />
+                <xsl:with-param name="y" as="xs:double" select="$axis/@yPos" />
+                <xsl:with-param name="total-count" as="xs:integer" select="count($events)" />
+                <xsl:with-param name="total-length" as="xs:double" select="$h" />
+            </xsl:apply-templates>
+        </xsl:variable>
+
         <xsl:variable name="txt" select="
                 if ( string-length($label) gt 0 ) then 
                     ois:svg-text($x, $axis/@yPos - $h - $text-gap, $label, 
@@ -404,7 +435,64 @@
                 else ''
         " />
 
+        <xsl:value-of select="concat($combo-line, $txt)" />
+    </xsl:function>
+
+    <xsl:template match="ue" mode="user-event-marker">
+        <xsl:param name="index" as="xs:integer" />
+        <xsl:param name="x" as="xs:double" />
+        <xsl:param name="y" as="xs:double" />
+        <xsl:param name="total-count" as="xs:integer" />
+        <xsl:param name="total-length" as="xs:double" />
+
+        <xsl:variable name="length" as="xs:double" select="@size * $total-length div $total-count" />
+        <xsl:variable name="line-class" select="concat('event-marker-', if ($index gt 3) then 'o' else $index)" />
+
+        <xsl:variable name="label" select="if (@size*20 gt $total-count) then @user else ''" />
+
+        <xsl:variable name="line" select="ois:svg-one-event-marker($x, $y, $length, $line-class, $label)" />
+        <xsl:variable name="next-lines">
+            <xsl:apply-templates select="following-sibling::*[1]" mode="user-event-marker">
+                <xsl:sort select="@size" order="descending"/>
+                <xsl:with-param name="index" as="xs:integer" select="$index + 1" />
+                <xsl:with-param name="x" as="xs:double" select="$x" />
+                <xsl:with-param name="y" as="xs:double" select="$y - $length" />
+                <xsl:with-param name="total-count" as="xs:integer" select="$total-count" />
+                <xsl:with-param name="total-length" as="xs:double" select="$total-length" />
+            </xsl:apply-templates>
+        </xsl:variable>
+
+        <xsl:value-of select="concat($line, $next-lines)" />
+    </xsl:template>
+
+
+
+    <xsl:function name="ois:svg-one-event-marker" as="xs:string">
+        <xsl:param name="x" as="xs:double" />
+        <xsl:param name="y-start" as="xs:double" />
+        <xsl:param name="length" as="xs:double" />
+        <xsl:param name="line-class" as="xs:string" />
+        <xsl:param name="label" as="xs:string" />
+
+        <xsl:variable name="text-gap" as="xs:integer" select="3" />
+
+        <xsl:variable name="line" select="
+                ois:svg-line($x, $x, 
+                    $y-start, $y-start - $length, 
+                    ois:svg-attr('class', $line-class))
+        " />
+        <xsl:variable name="txt" select="
+                if ( string-length($label) gt 0 and $length gt $text-gap * 3 ) then 
+                    ois:svg-text($x + $text-gap, $y-start - $length + $text-gap * 2, $label, 
+                        concat(
+                            ois:svg-attr('style', 'text-anchor: right;'),
+                            ois:svg-attr('class', 'marker-label')
+                        )
+                    )
+                else ''
+        " />
         <xsl:value-of select="concat($line, $txt)" />
+
     </xsl:function>
 
     <!-- ===================================================== -->

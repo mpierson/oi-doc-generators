@@ -44,10 +44,15 @@ path.key-column {
 
 
 
-.timeline-line { stroke: #77c8b3; stroke-width: 3; }
-.date-marker { stroke: #77c8b3; stroke-width: 2; }
-.date-label { font-family: Arial, sans-serif; font-size: 8px; fill: #77c8b3; font-weight: bold; }
-.event-marker { stroke: #82a7c5; stroke-width: 4; }
+.timeline-line { stroke: #ee8a54; stroke-width: 3; }
+.date-marker { stroke: #ee8a54; stroke-width: 2; }
+.date-label { font-family: Arial, sans-serif; font-size: 8px; fill: #ee8a54; font-weight: bold; }
+
+.event-marker { stroke: #00969f; stroke-width: 4; }
+.event-marker-1 { stroke: #00969f; stroke-width: 4; }
+.event-marker-2 { stroke: #77c8b3; stroke-width: 4; }
+.event-marker-3 { stroke: #82a7c5; stroke-width: 4; }
+.event-marker-o { stroke: #cad4d7; stroke-width: 4; }
 .marker-label { font-family: Arial, sans-serif; font-size: 8px; fill: #00969f; font-weight: bold; }
 
 

@@ -81,11 +81,14 @@
 
       <xsl:if test="count($values/rows/row) &gt; 0">
 
-      <xsl:text>
-
-Table: </xsl:text><xsl:value-of select="$summary"/> {#tbl:<xsl:value-of select="$id"/>} 
-<xsl:text>
-</xsl:text>
+          <xsl:value-of select="concat(
+                '&#xa;&#xa;Table: ',
+                $summary,
+                if ( $max-size gt 0 and count($values/rows/row) gt $max-size ) 
+                    then concat(' (top ', $max-size, ')') 
+                    else ''
+          )" />
+          <xsl:value-of select="concat(' {#tbl:', $id, '}', '&#xa;&#xa;')" />
       <xsl:value-of select="normalize-space($header)" /><xsl:text>
 </xsl:text><xsl:value-of select="normalize-space($separator)" />
 <xsl:apply-templates select="$values/rows/row[position() &lt;= $size-limit]" mode="table" />
