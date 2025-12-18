@@ -31,7 +31,15 @@ Once the SPP configs have been exported as XML, apply the _SPPAsBuiltToMD.xsl_ t
 
 Transform pre-requisites:
 
-- XSLT v2 processor (e.g. SaxonB)
+- XSLT v3 processor (e.g. SaxonHE)
+- OIS-IPv4Lib.xsl transform library
+- OIS-StringLib.xsl transform library
+- OIS-MarkdownLib.xsl transform library
+- OIS-PlantUMLLib.xsl transform library
+- OIS-SVGLib.xsl transform library
+- schedules.R and timeline\_plot.R scripts
+- header.puml
+- header.svg
 
 
 ## Safeguard for Privileged Sessions
@@ -42,8 +50,15 @@ Apply the _SPSAsBuiltToMD.xsl_ transform to convert the configuration file to Ma
 
 Transform pre-requisites:
 
-- XSLT v2 processor (e.g. SaxonB)
+- XSLT v3 processor (e.g. SaxonHE)
 - OIS-IPv4Lib.xsl transform library
+- OIS-StringLib.xsl transform library
+- OIS-MarkdownLib.xsl transform library
+- OIS-PlantUMLLib.xsl transform library
+- OIS-SVGLib.xsl transform library
+- schedules.R and timeline\_plot.R scripts
+- header.puml
+- header.svg
 
 
 ## syslog-ng Store Box
@@ -81,10 +96,15 @@ Markdown files may include diagrams in the PlantUML and R (ggplot2) languages.
 
 Transform pre-requisites:
 
-- XSLT v2 processor (e.g. SaxonB)
+- XSLT v3 processor (e.g. SaxonHE)
 - OIS-IPv4Lib.xsl transform library
 - OIS-StringLib.xsl transform library
 - OIS-MarkdownLib.xsl transform library
 - OIS-PlantUMLLib.xsl transform library
+- OIS-ProjectLib.xsl transform library
+- OIS-SVGLib.xsl transform library
 - schedules.R and timeline\_plot.R scripts
+- header.puml PlantUML header
+- header.svg SVG header
+
 
