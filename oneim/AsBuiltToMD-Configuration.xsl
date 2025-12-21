@@ -2470,35 +2470,41 @@ Table: Summary of account definitions {#tbl:summary-account-definitions}
 </xsl:template>
 <xsl:template match="AccountDefinition">
 
-## <xsl:value-of select="replace(@name, '\\', '/')" />
+    <xsl:value-of select="ois:markdown-heading-2(@name)" />
 
-<xsl:if test="string-length(Description) &gt; 0">
-**Description**: <xsl:value-of select="Description" />
-</xsl:if>
+    <xsl:value-of select="ois:markdown-definition('Description', Description)" /> 
+    <xsl:value-of select="ois:markdown-definition('Parent definition', RequiredAccountDef/@name)" /> 
+    <xsl:value-of select="ois:markdown-definition('Table', Table/@name)" /> 
+    <xsl:value-of select="ois:markdown-definition('Target system', 
+            concat(TargetSystem/@table, ':', TargetSystem/@name))" /> 
+    <xsl:value-of select="ois:markdown-definition('Default behavior', DefaultBehavior/@name)" /> 
+    <xsl:value-of select="ois:markdown-definition('Automatic assignment', @isAutoAssignToPerson)" /> 
 
-<xsl:if test="RequiredAccountDef">
-**Parent account definition**: <xsl:value-of select="RequiredAccountDef/@name" />
-</xsl:if>
+    <xsl:value-of select="ois:markdown-heading-3( 'Manage Levels' )" />
 
-### Manage Levels
+    <xsl:call-template name="ois:generate-table">
+        <xsl:with-param name="summary" select="concat('Manage levels for account definition ', @name)" />
+        <xsl:with-param name="id" select="concat('account-definition-manage-levels-', @id)" />
+        <xsl:with-param name="header"   >| Level     | Description       | Last Modified |</xsl:with-param>
+        <xsl:with-param name="separator">|:----------|:------------------|:--------------|</xsl:with-param>
+        <xsl:with-param name="values">
+            <rows>
+                <xsl:apply-templates select="Behaviors/Behavior" mode="table">
+                    <xsl:sort select="@name" order="ascending" />
+                </xsl:apply-templates>
+            </rows>
+        </xsl:with-param>
+    </xsl:call-template>
 
-Table: Manage levels for account definition <xsl:value-of select="@name"/> {#tbl:account-definition-behaviors-<xsl:value-of select="@id" />}
-
-| Level     | Description       | Last Modified |
-|:----------|:------------------|:--------------|
-<xsl:for-each select="Behaviors/Behavior"
-       ><xsl:sort select="@name" order="ascending"
-     />| **<xsl:value-of select="replace(@name, '\\', '/')" 
-  />** | <xsl:value-of select="Description" 
-    /> | <xsl:value-of select="ois:last-modified(BehaviorProperties)"
-    /> |                 
-</xsl:for-each>   
+    <xsl:apply-templates select="Behaviors/Behavior">
+        <xsl:sort select="@name" />
+    </xsl:apply-templates>
 
 <xsl:if test="DataMappings/DataMapping">
     <xsl:variable name="accountDef" select="@id" />
     <xsl:variable name="targetTable" select="TargetSystem/@table" />
 
-### IT Data Mapping
+    <xsl:value-of select="ois:markdown-heading-3( 'IT Data Mapping' )" />
 
     <xsl:call-template name="ois:generate-table">
         <xsl:with-param name="summary" select="concat('IT Data columns for account definition ', @name)" />
@@ -2519,9 +2525,55 @@ Table: Manage levels for account definition <xsl:value-of select="@name"/> {#tbl
     </xsl:apply-templates>
 
 </xsl:if>
-
-
 </xsl:template>
+
+<xsl:template match="Behavior">
+    <xsl:value-of select="ois:markdown-heading-4( concat('Manage level: ', @name) )" />
+
+    <xsl:apply-templates select="BehaviorProperties" mode="aligned-list" />
+</xsl:template>
+<xsl:template match="BehaviorProperties" mode="aligned-list">
+    <xsl:call-template name="ois:generate-markdown-aligned-list">
+        <xsl:with-param name="values">
+            <items>
+                <value name="IT operating data overwrite"><xsl:value-of select="ois:manage-level-overwrites(Property[@Field='ITDataUsage'])" /></value>
+
+                <value name="Retain groups if temporarily disabled"><xsl:value-of select="Property[@Field='PTDInheritGroup']" /></value>
+                <value name="Disable user accounts if temporarily disabled"><xsl:value-of select="Property[@Field='PTDLockAccount']" /></value>
+
+                <value name="Retain groups if permanently disabled"><xsl:value-of select="Property[@Field='PFDInheritGroup']" /></value>
+                <value name="Disable user accounts if permanently disabled"><xsl:value-of select="Property[@Field='PFDLockAccount']" /></value>
+
+                <value name="Retain groups on deferred deletion"><xsl:value-of select="Property[@Field='PMDInheritGroup']" /></value>
+                <value name="Disable user accounts on deferred deletion"><xsl:value-of select="Property[@Field='PMDLockAccount']" /></value>
+
+                <value name="Retain groups on security risk"><xsl:value-of select="Property[@Field='PSIInheritGroup']" /></value>
+                <value name="Disable user accounts on security risk"><xsl:value-of select="Property[@Field='PSILockAccount']" /></value>
+
+            </items>
+        </xsl:with-param>
+        <xsl:with-param name="separator" select="'|:------|:--|'" />
+    </xsl:call-template>
+</xsl:template>
+
+<xsl:function name="ois:manage-level-overwrites" as="xs:string">
+    <xsl:param name="key" as="xs:string" />
+    <xsl:value-of select="
+        if ( $key='-1' ) then 'Only initially'
+        else if ( $key='0' ) then 'Never'
+        else if ( $key='1' ) then 'Always'
+        else ''
+    " />
+</xsl:function> 
+
+<xsl:template match="Behavior" mode="table">
+    <row>
+        <value><xsl:value-of select="@name" /></value>
+        <value><xsl:value-of select="Description" /></value>
+        <value><xsl:value-of select="ois:last-modified(BehaviorProperties)" /></value>
+    </row>
+</xsl:template>
+
 <xsl:template match="DataMapping" mode="table">
     <row>
         <value><xsl:value-of select="concat(../../TargetSystem/@table, ': ', Column/@name)" /></value>

@@ -46,22 +46,25 @@
   </xsl:function>
 
 
+  <!-- ======= TABLES ============================= -->
+
   <!-- Replace line feeds etc from string, suitable for Markdown table -->
   <xsl:template name="ois:escape-for-markdown-table">
     <xsl:param name="s" as="xs:string?"/>
-    
     <xsl:variable name="tokens" select="tokenize($s, '&#10;')" />
     <xsl:for-each select="$tokens">
-        <xsl:value-of select="concat(., '&lt;br /&gt;')" />
+        <xsl:value-of select="concat(
+            .,
+            if ( count($tokens) gt 1 ) then '&lt;br /&gt;' else ''
+        )" />
     </xsl:for-each>
-
   </xsl:template>
   <xsl:function name="ois:encode-breaks-for-markdown-table" as="xs:string">
     <xsl:param name="s" as="xs:string"/>
     <xsl:variable name="tokens" select="tokenize($s, '&#10;')" />
     <xsl:variable name="result">
         <xsl:for-each select="$tokens">
-            <xsl:value-of select="concat(., '&lt;br /&gt;')" />
+            <xsl:value-of select="concat(., if( count($tokens) gt 1 ) then '&lt;br /&gt;' else '')" />
         </xsl:for-each>
     </xsl:variable>
     <xsl:value-of select="$result" />
@@ -81,15 +84,19 @@
 
       <xsl:if test="count($values/rows/row) &gt; 0">
 
-          <xsl:value-of select="concat(
-                '&#xa;&#xa;Table: ',
-                $summary,
-                if ( $max-size gt 0 and count($values/rows/row) gt $max-size ) 
-                    then concat(' (top ', $max-size, ')') 
-                    else ''
-          )" />
-          <xsl:value-of select="concat(' {#tbl:', $id, '}', '&#xa;&#xa;')" />
-      <xsl:value-of select="normalize-space($header)" /><xsl:text>
+          <xsl:if test="string-length($summary) gt 0">
+              <xsl:value-of select="concat(
+                    '&#xa;&#xa;Table: ',
+                    $summary,
+                    if ( $max-size gt 0 and count($values/rows/row) gt $max-size ) 
+                        then concat(' (top ', $max-size, ')') 
+                        else ''
+              )" />
+          </xsl:if>
+          <xsl:if test="string-length($id) gt 0">
+              <xsl:value-of select="concat(' {#tbl:', $id, '}', '&#xa;&#xa;')" />
+          </xsl:if>
+          <xsl:value-of select="normalize-space($header)" /><xsl:text>
 </xsl:text><xsl:value-of select="normalize-space($separator)" />
 <xsl:apply-templates select="$values/rows/row[position() &lt;= $size-limit]" mode="table" />
   </xsl:if>
@@ -123,6 +130,44 @@
       </xsl:choose>
   </xsl:template>
 
+  <!-- generate a markdown list, suitable for table cell -->
+  <xsl:template name="ois:generate-markdown-table-list">
+      <xsl:param name="values" /><!-- expect <items><value>xxx</value>...</items> -->
+      <xsl:if test="count($values/items/value) &gt; 0">
+          <xsl:apply-templates select="$values/items/value" mode="table-list" />
+      </xsl:if>
+  </xsl:template>
+  <xsl:template match="items" mode="table-list">
+      <xsl:apply-templates select="value" mode="table-list" />
+  </xsl:template>
+  <xsl:template match="value" mode="table-list">
+      <xsl:value-of select="ois:encode-breaks-for-markdown-table(concat('- ', ois:escape-for-markdown(.), ' '))" />
+  </xsl:template>
+
+
+  <!-- generate an aligned list as un-decorated two-column table -->
+  <xsl:template name="ois:generate-markdown-aligned-list">
+      <xsl:param name="separator" as="xs:string" />
+      <xsl:param name="values" /><!-- expect <items><value name="">xxx</value>...</items> -->
+      <xsl:value-of select="'&#xa;&#xa;::: {class=&quot;aligned-list&quot;}&#xa;'" />
+      <xsl:call-template name="ois:generate-table">
+          <xsl:with-param name="header" select="'| | |'" />
+          <xsl:with-param name="separator" select="$separator" />
+          <xsl:with-param name="values">
+              <rows> <xsl:apply-templates select="$values/items/value" mode="aligned-list" /> </rows>
+          </xsl:with-param>
+      </xsl:call-template>
+      <xsl:value-of select="'&#xa;:::&#xa;'" />
+  </xsl:template>
+  <xsl:template match="value" mode="aligned-list">
+      <row>
+          <value><xsl:value-of select="@name" /></value>
+          <value><xsl:value-of select="." /></value>
+      </row>
+  </xsl:template>
+
+
+  <!-- ======= DEF LIST ============================= -->
 
   <!-- Function to output markdown definition, if value is not null -->
   <xsl:function name="ois:markdown-definition" as="xs:string">
@@ -186,23 +231,11 @@
     </xsl:variable>
     <xsl:value-of select="$result" />
   </xsl:function>
-  <!-- Function to create inline code, with max length -->
-  <xsl:function name="ois:markdown-inline-code" as="xs:string">
-    <xsl:param name="s" as="xs:string?"/>
-    <xsl:param name="length" as="xs:integer"/>
 
-    <xsl:variable name="result">
-        <xsl:choose>
-            <xsl:when test="string-length($s) &gt; 0">
-                <xsl:value-of select="concat(
-                            '`',
-                            ois:truncate-string(translate($s, '&#xa;', ' '), $length, '...'),
-                            '`')" />
-            </xsl:when>
-        </xsl:choose>
-    </xsl:variable>
-    <xsl:value-of select="$result" />
-  </xsl:function>
+
+
+
+  <!-- ======= LISTS ============================= -->
 
   <!-- generate a markdown list -->
   <xsl:template name="ois:generate-markdown-list">
@@ -247,6 +280,27 @@
   </xsl:function>
 
 
+  <!-- ======= CODE ============================= -->
+
+  <!-- Function to create inline code, with max length -->
+  <xsl:function name="ois:markdown-inline-code" as="xs:string">
+    <xsl:param name="s" as="xs:string?"/>
+    <xsl:param name="length" as="xs:integer"/>
+
+    <xsl:variable name="result">
+        <xsl:choose>
+            <xsl:when test="string-length($s) &gt; 0">
+                <xsl:value-of select="concat(
+                            '`',
+                            ois:truncate-string(translate($s, '&#xa;', ' '), $length, '...'),
+                            '`')" />
+            </xsl:when>
+        </xsl:choose>
+    </xsl:variable>
+    <xsl:value-of select="$result" />
+  </xsl:function>
+
+
   <xsl:template name="ois:generate-markdown-code-block">
       <xsl:param name="header" />
       <xsl:param name="code" />
@@ -264,6 +318,7 @@
   </xsl:template>
 
 
+  <!-- ======= FIGURE ============================= -->
 
   <!-- Function to output markdown figure -->
   <xsl:function name="ois:markdown-figure" as="xs:string">
@@ -277,6 +332,9 @@
     </xsl:variable>
     <xsl:value-of select="$result" />
   </xsl:function>
+
+
+  <!-- ======= HEADINGS ============================= -->
 
   <!-- Function to output markdown heading -->
   <xsl:function name="ois:markdown-heading" as="xs:string">
@@ -311,20 +369,5 @@
     <xsl:param name="caption" as="xs:string"/>
     <xsl:value-of select="ois:markdown-heading($caption, 5)" />
   </xsl:function>
-
-  <!-- generate a markdown list, suitable for table cell -->
-  <xsl:template name="ois:generate-markdown-table-list">
-      <xsl:param name="values" /><!-- expect <items><value>xxx</value>...</items> -->
-      <xsl:if test="count($values/items/value) &gt; 0">
-          <xsl:apply-templates select="$values/items/value" mode="table-list" />
-      </xsl:if>
-  </xsl:template>
-  <xsl:template match="items" mode="table-list">
-      <xsl:apply-templates select="value" mode="table-list" />
-  </xsl:template>
-  <xsl:template match="value" mode="table-list">
-      <xsl:value-of select="ois:encode-breaks-for-markdown-table(concat('- ', ois:escape-for-markdown(.), ' '))" />
-  </xsl:template>
-
 
 </xsl:stylesheet>

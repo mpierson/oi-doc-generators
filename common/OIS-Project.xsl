@@ -42,11 +42,16 @@
     </xsl:template>
     <xsl:template match="dnode" mode="components">
         <xsl:variable name="content">
-            <xsl:apply-templates select="dnode|infra|container" mode="components" />
+            <xsl:apply-templates select="dnode|infra|containers|container" mode="components" />
         </xsl:variable>
         <xsl:value-of select="ois:c4-node(
                 ois:get-component-id(.), @name, @description, ois:get-tag(.), $content
             )" />
+    </xsl:template>
+    <xsl:template match="containers" mode="components">
+        <xsl:value-of select="'&#xa;together {&#xa;'" />
+            <xsl:apply-templates select="container" mode="components" />
+        <xsl:value-of select="'&#xa;}&#xa;'" />
     </xsl:template>
     <xsl:template match="container" mode="components">
         <xsl:value-of select="ois:c4-container(
@@ -65,7 +70,10 @@
     </xsl:template>
     <xsl:template match="dnode" mode="relations">
         <xsl:apply-templates select="uses" />
-        <xsl:apply-templates select="dnode|infra|container" mode="relations" />
+        <xsl:apply-templates select="dnode|infra|containers|container" mode="relations" />
+    </xsl:template>
+    <xsl:template match="containers" mode="relations">
+        <xsl:apply-templates select="container" mode="relations" />
     </xsl:template>
     <xsl:template match="container" mode="relations">
         <xsl:apply-templates select="uses" />
@@ -117,6 +125,8 @@
                 else if ( $type eq 'OneIM web server' ) then 'OneIM_Deploy_WS'
                 else if ( $type eq 'OneIM app server' ) then 'OneIM_Deploy_AS'
                 else if ( $type eq 'OneIM tools' ) then      'OneIM_Deploy_Tools'
+                else if ( $type eq 'ActiveRoles server' )     then 'AR_Deploy_AS'
+                else if ( $type eq 'ActiveRoles database' )   then 'AR_Deploy_DB'
                 else if ( $type eq 'SPP' ) then              'SG_Deploy_SPP'
                 else if ( $type eq 'SPS' ) then              'SG_Deploy_SPS'
                 else if ( $type eq 'starling connect instance' ) then'StarlingConnect_Connector'
