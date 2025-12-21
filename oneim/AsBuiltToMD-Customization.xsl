@@ -842,6 +842,8 @@ abstract: |
     <xsl:value-of select="ois:patched-markdown-definition-codeblock( ., 'Template', 'Value template (custom)', 'monobasic')" />
     <xsl:value-of select="ois:patched-markdown-definition-codeblock( ., 'FormatScript', 'Format script (custom)', 'monobasic')" />
 
+    <xsl:apply-templates select="LimitedValues" />
+
 </xsl:template>
 <xsl:function name="ois:oneim-column-type">
     <xsl:param name="t" as="xs:integer?"/>
@@ -877,6 +879,33 @@ abstract: |
     </xsl:variable>
     <xsl:value-of select="$result" />
 </xsl:function>
+
+<xsl:template match="LimitedValues">
+    <!-- <xsl:value-of select="ois:markdown-heading-5('Limited Values')" /> -->
+
+    <xsl:call-template name="ois:generate-table">
+        <xsl:with-param name="summary" select="concat('Summary of allowed values for ', ../@name)" />
+        <xsl:with-param name="id" select="concat('templates-', ../@id)" />
+        <xsl:with-param name="header"   >| Key   | Value    | Active? | Last Modified |</xsl:with-param>
+        <xsl:with-param name="separator">|:------|:---------|:---:|:--------------|</xsl:with-param>
+        <xsl:with-param name="values">
+            <rows> <xsl:apply-templates select="LimitedValue" mode="table">
+                    <xsl:sort select="@sortOrder" data-type="number" order="ascending" />
+                    <xsl:sort select="@keyName" order="ascending" />
+            </xsl:apply-templates> </rows>
+        </xsl:with-param>
+    </xsl:call-template>
+
+</xsl:template>
+<xsl:template match="LimitedValue" mode="table">
+    <row>
+        <value><xsl:value-of select="ois:truncate-string(@keyValue, 24, '...')" /></value>
+        <value><xsl:value-of select="@keyDisplay" /></value>
+        <value><xsl:value-of select="@isInActive" /></value>
+        <value><xsl:value-of select="ois:last-modified(.)" /></value>
+    </row>
+</xsl:template>
+
 
 
 <!-- ===== Mail Templates ======================= -->
