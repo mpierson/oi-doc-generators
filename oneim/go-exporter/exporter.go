@@ -40,6 +40,7 @@ type ExporterConfig struct {
 	OutFileName       string
 	IsVerbose         bool
 	MaxThreads        int
+	UseCache          bool
 }
 
 // convenience function to create attr generator for given XML name-to-DB name map
@@ -119,6 +120,8 @@ func main() {
 	flag.BoolVar(&config.IsVerbose, "verbose", false, "Verbose output to stdout")
 	flag.IntVar(&config.MaxThreads, "max-threads", 8, "Max threads to spawn for each encoding")
 
+	flag.BoolVar(&config.UseCache, "use-cache", false, "Cache data in often used tables")
+
 	flag.StringVar(&config.OutFileName, "file", "", "output file name")
 
 	flag.Parse()
@@ -155,8 +158,38 @@ func StartExporter(config ExporterConfig) {
 	}
 	defer xmlFile.Close()
 
-	encodeOneIMAsXML(config, db1, xmlFile)
+	// fill the cache with tables that are read multiple times
+	if config.UseCache {
 
+		config.dbg("Loading cache")
+
+		cache_map := make(map[string]*dbx.CachedTable)
+
+		cacheOneTable(db1, "DialogTaggedItem", &cache_map)
+		cacheOneTable(db1, "QBMBufferConfig", &cache_map)
+		cacheOneTable(db1, "JobParameter", &cache_map)
+		cacheOneTable(db1, "QBMColumnLimitedValue", &cache_map)
+		cacheOneTable(db1, "JobRunParameter", &cache_map)
+		cacheOneTable(db1, "DialogTable", &cache_map)
+		cacheOneTable(db1, "DPRSchemaProperty", &cache_map)
+		cacheOneTable(db1, "DPRSchemaClass", &cache_map)
+		cacheOneTable(db1, "JobComponent", &cache_map)
+		cacheOneTable(db1, "JobTask", &cache_map)
+		cacheOneTable(db1, "DialogReportQueryModule", &cache_map)
+		cacheOneTable(db1, "JobChain", &cache_map)
+
+		config.DBConfig.CachedTables = &cache_map
+	}
+
+	encodeOneIMAsXML(config, db1, xmlFile)
+}
+func cacheOneTable(db *sqlx.DB, name string, cache *map[string]*dbx.CachedTable) {
+	cdb, err := dbx.CacheOneTable(db, name)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	(*cache)[name] = cdb
 }
 
 func encodeOneIMAsXML(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
@@ -174,12 +207,14 @@ func encodeOneIMAsXML(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 	io.WriteString(o, fmt.Sprintf("<IdentityManager %s>", instanceAttrs))
 
 	encodePrimaryDB(config, db, o)
+	encodeModules(config, db, o)
 	encodeServers(config, db, o)
 	encodePasswordPolicies(config, db, o)
 	encodeSystemUsers(config, db, o)
 	encodeConfigParameters(config, db, o)
 	encodeStructures(config, db, o)
 	encodeRoles(config, db, o, "AERole", "1=1", "ApplicationRole", "UID_AERole", "Ident_AERole", "PersonInAERole")
+	encodeRoles(config, db, o, "ESet", "1=1", "SystemRole", "UID_ESet", "Ident_ESet", "PersonHasESet", encodeESetEntitlements)
 	encodeRoleClasses(config, db, o)
 	encodeAccountDefinitions(config, db, o)
 
@@ -204,6 +239,7 @@ func encodeOneIMAsXML(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 	encodeScripts(config, db, o)
 
 	encodeMailTemplates(config, db, o)
+	encodeReports(config, db, o)
 
 	encodeLimitedSQL(config, db, o)
 
@@ -248,6 +284,17 @@ func encodeOrgReference(c *exml.TableContext, UID_Org string, xmlName string) {
 		exml.EncodingOptions{
 			NoContent: true,
 			F_Attrs:   stdOrgAttrs,
+			F_Content: func(bt_c *exml.TableContext) {
+				exml.EncodeFKReference(bt_c,
+					"OrgRoot", "UID_OrgRoot", "Type",
+					exml.EncodingOptions{
+						NoContent: true,
+						F_Attrs: makeAttrFn(map[string]string{
+							"name": "Ident_OrgRoot",
+						}),
+					},
+				)
+			},
 		},
 	)
 }
@@ -350,6 +397,7 @@ func encodeObjectPatches(c *exml.TableContext) {
 	exml.EncodeRelatedTable(c, "QBMBufferConfig", wc,
 		"Patch",
 		exml.EncodingOptions{
+			SkipEmpty:        true,
 			NoContent:        true,
 			PluralObjectName: "Patches",
 			F_Attrs: makeAttrFn(
@@ -359,6 +407,27 @@ func encodeObjectPatches(c *exml.TableContext) {
 			F_Content: func(p_c *exml.TableContext) {
 				exml.EncodeRowAttribute(p_c, "ContentShort")
 				exml.EncodeRowAttribute(p_c, "ContentFull")
+			},
+		},
+	)
+
+	wc = fmt.Sprintf(`ObjectKey = '%s'`, c.GetStringVal("XObjectKey"))
+	exml.EncodeRelatedTable(c, "DialogTaggedItem", wc,
+		"TaggedChange",
+		exml.EncodingOptions{
+			NoContent: true,
+			SkipEmpty: true,
+			F_Attrs: makeAttrFn(
+				map[string]string{"id": "UID_DialogTaggedItem"},
+				[]string{"IsDelete", "IsContainerItem"},
+			),
+			F_Content: func(ti_c *exml.TableContext) {
+				exml.EncodeFKReference(ti_c, "DialogTag", "UID_DialogTag", "Tag",
+					exml.EncodingOptions{
+						NoContent: true,
+						F_Attrs:   stdTagAttrs,
+					},
+				)
 			},
 		},
 	)
@@ -386,12 +455,17 @@ func encodeJobReference(c *exml.TableContext, ParentAttr string, JobAttr string,
 	)
 }
 
+func encodeTableCount(c *exml.TableContext, table string, xmlName string) {
+	n, _ := dbx.GetTableCount(c.DBContext, table, "1=1")
+	exml.EncodeAttribute(c.Writer, xmlName, strconv.Itoa(n))
+}
+
 // -------------------------------------
 
 func encodePrimaryDB(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("DialogDatabase")
-	exml.EncodeSingletonTable(db, "DialogDatabase", "1=1", "PrimaryDatabase", o,
+	exml.EncodeSingletonTable(db, "DialogDatabase", "1=1", "PrimaryDatabase", o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			NoContent:   true,
 			IsSingleton: true,
@@ -406,19 +480,54 @@ func encodePrimaryDB(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 				return slices.Concat(baseAttrs, connAttrs), nil
 			},
+			F_Content: func(pdb_c *exml.TableContext) {
+
+				io.WriteString(pdb_c.Writer, "<metrics>")
+				encodeTableCount(pdb_c, "Person", "Users")
+				encodeTableCount(pdb_c, "UNSAccount", "Accounts")
+				encodeTableCount(pdb_c, "PersonWantsOrg", "Requests")
+				encodeTableCount(pdb_c, "AttestationCase", "AttestationCases")
+				io.WriteString(pdb_c.Writer, "</metrics>")
+
+			},
 		})
 
 	return nil
 }
 
-func encodePasswordPolicies(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
+func encodeModules(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
-	rows, err := dbx.GetAllTableRows(db, "QBMPwdPolicy")
+	config.dbg("Modules")
+	rows, err := dbx.GetAllCachedTableRows(db, "QBMModuleDef", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("PasswordPolicy", db, rows, o,
+	return exml.EncodeTable("Module", db, rows, o, config.DBConfig.CachedTables,
+		exml.EncodingOptions{
+			NoContent: true,
+			F_Attrs: makeAttrFn(
+				map[string]string{
+					"id":   "UID_QBMModuleDef",
+					"name": "ModuleName",
+				},
+				[]string{"DisplayValue", "SortOrder", "MigrationVersion", "ModuleVersion"},
+			),
+			F_Content: func(m_c *exml.TableContext) {
+			},
+		},
+	)
+}
+
+func encodePasswordPolicies(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
+
+	config.dbg("Password Policies")
+	rows, err := dbx.GetAllCachedTableRows(db, "QBMPwdPolicy", config.DBConfig.CachedTables)
+	if err != nil {
+		return err
+	}
+
+	return exml.EncodeTable("PasswordPolicy", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			PluralObjectName: "PasswordPolicies",
 			F_Attrs: makeAttrFn(map[string]string{"id": "UID_QBMPwdPolicy",
@@ -459,12 +568,12 @@ func encodePasswordPolicyObjectAssignments(mo_context *exml.TableContext) {
 func encodeSystemUsers(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("DialogUser")
-	rows, err := dbx.GetAllTableRows(db, "DialogUser")
+	rows, err := dbx.GetAllCachedTableRows(db, "DialogUser", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("Administrator", db, rows, o,
+	return exml.EncodeTable("Administrator", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs: makeAttrFn(map[string]string{
 				"id":               "UID_DialogUser",
@@ -499,6 +608,7 @@ func encodeOneStructure(config ExporterConfig, db *sqlx.DB, o io.Writer,
 			exml.EncodeMatchingRows(d_c.DBContext, "Person", wc,
 				"PrimaryAssignment",
 				d_c.Writer,
+				config.DBConfig.CachedTables,
 				exml.EncodingOptions{
 					NoContent: true,
 					SkipEmpty: true,
@@ -521,7 +631,7 @@ func encodeRoles(config ExporterConfig, db *sqlx.DB, o io.Writer,
 	childEncodings ...func(*exml.TableContext)) error {
 
 	config.dbg("Role class: " + roleTable)
-	rows, err := dbx.GetTableRows(db, roleTable, whereClause)
+	rows, err := dbx.GetCachedTableRows(db, roleTable, whereClause, config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
@@ -531,14 +641,16 @@ func encodeRoles(config ExporterConfig, db *sqlx.DB, o io.Writer,
 		return !strings.HasPrefix(path, "Request & Fulfillment\\IT Shop\\Product owners")
 	}
 
-	return exml.EncodeTable(xmlName, db, rows, o,
+	return exml.EncodeTable(xmlName, db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			PostFilter: post_filter,
 			F_Attrs: makeAttrFn(map[string]string{
-				"id":        idAttr,
-				"name":      nameAttr,
-				"shortName": "ShortName",
-				"fullPath":  "FullPath"}),
+				"id":          idAttr,
+				"name":        nameAttr,
+				"shortName":   "ShortName",
+				"fullPath":    "FullPath",
+				"displayName": "DisplayName",
+			}),
 			F_Content: func(role_c *exml.TableContext) {
 				encodeRoleContent(config, role_c, idAttr, membershipTable)
 
@@ -553,6 +665,8 @@ func encodeRoles(config ExporterConfig, db *sqlx.DB, o io.Writer,
 func encodeRoleContent(config ExporterConfig, role_c *exml.TableContext, idAttr string, membershipTable string) {
 
 	exml.EncodeRowAttribute(role_c, "Description")
+
+	encodeRoleAssignments(config, role_c, idAttr)
 
 	exml.EncodeCRReference(role_c,
 		"AERole", "UID_AERoleManager", "UID_AERole", "ManagerRole",
@@ -590,41 +704,11 @@ func encodeRoleContent(config ExporterConfig, role_c *exml.TableContext, idAttr 
 		},
 	)
 
-	// QERVBaseTreeHasElement is only available from v9 forward
-	if config.OneIMMajorVersion >= 9 {
-		exml.EncodeChildTable(role_c,
-			"QERVBaseTreeHasElement", idAttr, "UID_Org", "ObjectAssignment",
-			exml.EncodingOptions{
-				NoContent: true,
-				SkipEmpty: true,
-				F_Attrs: makeAttrFn(map[string]string{
-					"UID_Element": "UID_Element",
-					"origin":      "InheritInfoOrigin"}),
-				F_Content: func(ct_c *exml.TableContext) {
-					exml.EncodeReferenceObjectKey(ct_c,
-						ct_c.GetStringVal("ObjectKeyElement"),
-						"AssignedObject",
-						exml.EncodingOptions{
-							SkipEmpty: true,
-							// include all possible object name attributes...
-							F_Attrs: makeAttrFn(map[string]string{
-								"name":                  "DisplayName",
-								"accountName":           "AccountName",
-								"accountDefinitionName": "Ident_TSBAccountDef",
-							}),
-						},
-					)
-				},
-			},
-		)
-	}
-
 	// user export depends on number of assignments...
 	wc, _ := dbx.GetFKWC(role_c.Row, idAttr)
 	memberCount, _ := dbx.GetTableCount(role_c.DBContext, membershipTable, wc)
-	if memberCount > 20 {
-		exml.EncodeAttribute(role_c.Writer, "UserCount", strconv.Itoa(memberCount))
-	} else {
+	exml.EncodeAttribute(role_c.Writer, "UserCount", strconv.Itoa(memberCount))
+	if memberCount < 20 {
 		exml.EncodeForeignTable(role_c,
 			membershipTable, idAttr, "UserAssignment",
 			exml.EncodingOptions{
@@ -670,6 +754,87 @@ func encodeRoleContent(config ExporterConfig, role_c *exml.TableContext, idAttr 
 	)
 }
 
+func encodeRoleAssignments(config ExporterConfig, role_c *exml.TableContext, idAttr string) {
+	// QERVBaseTreeHasElement is only available from v9 forward
+	if config.OneIMMajorVersion >= 9 {
+
+		exml.EncodeChildTable(role_c,
+			"QERVBaseTreeHasElement", idAttr, "UID_Org", "ObjectAssignment",
+			exml.EncodingOptions{
+				NoContent: true,
+				SkipEmpty: true,
+				F_Attrs: makeAttrFn(map[string]string{
+					"UID_Element": "UID_Element",
+					"origin":      "InheritInfoOrigin"}),
+				F_Content: func(ct_c *exml.TableContext) {
+					exml.EncodeReferenceObjectKey(ct_c,
+						ct_c.GetStringVal("ObjectKeyElement"),
+						"AssignedObject",
+						exml.EncodingOptions{
+							SkipEmpty: true,
+							NoContent: true,
+							// include all possible object name attributes...
+							F_Attrs: makeAttrFn(map[string]string{
+								"name":                  "DisplayName",
+								"accountName":           "AccountName",
+								"accountDefinitionName": "Ident_TSBAccountDef",
+							}),
+						},
+					)
+				},
+			},
+		)
+
+		// likely an org structure, role, system role
+		exml.EncodeChildTable(role_c,
+			"QERVBaseTreeHasElement", idAttr, "UID_Element", "AssignedToObject",
+			exml.EncodingOptions{
+				NoContent: true,
+				SkipEmpty: true,
+				F_Attrs: makeAttrFn(map[string]string{
+					"UID_Org": "UID_Org",
+					"origin":  "InheritInfoOrigin"}),
+				F_Content: func(ct_c *exml.TableContext) {
+					encodeOrgReference(ct_c, "UID_Org", "AssignedTo")
+				},
+			},
+		)
+
+	} // if v9
+
+}
+
+func encodeESetEntitlements(c *exml.TableContext) {
+
+	exml.EncodeForeignTable(c,
+		"ESetHasEntitlement", "UID_ESet", "AssignedEntitlement",
+		exml.EncodingOptions{
+			NoContent: true,
+			SkipEmpty: true,
+			F_Attrs: makeAttrFn(
+				map[string]string{"id": "UID_ESetHasEntitlement"},
+				[]string{"XOrigin", "XIsInEffect"},
+			),
+			F_Content: func(ct_c *exml.TableContext) {
+				exml.EncodeReferenceObjectKey(ct_c,
+					ct_c.GetStringVal("Entitlement"),
+					"Entitlement",
+					exml.EncodingOptions{
+						NoContent: true,
+						SkipEmpty: true,
+						// include all possible object name attributes
+						F_Attrs: makeAttrFn(map[string]string{
+							"name":                  "DisplayName",
+							"accountName":           "AccountName",
+							"accountDefinitionName": "Ident_TSBAccountDef",
+						}),
+					},
+				)
+			},
+		},
+	)
+}
+
 func stdOrgAttrs(c *exml.TableContext) ([]xml.Attr, error) {
 	attrs := map[string]string{
 		"id":       "UID_Org",
@@ -681,7 +846,7 @@ func stdOrgAttrs(c *exml.TableContext) ([]xml.Attr, error) {
 }
 
 func encodeRoleClasses(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
-	rows, err := dbx.GetAllTableRows(db, "OrgRoot")
+	rows, err := dbx.GetAllCachedTableRows(db, "OrgRoot", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
@@ -692,7 +857,7 @@ func encodeRoleClasses(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 		r, _ := regexp.MatchString(`^...-`, id)
 		return !r
 	}
-	return exml.EncodeTable("RoleClass", db, rows, o,
+	return exml.EncodeTable("RoleClass", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			PluralObjectName: "RoleClasses",
 			PostFilter:       postFilter,
@@ -726,7 +891,7 @@ func encodeRoleClasses(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 					},
 				)
 
-				whereClause := fmt.Sprintf(`UID_OrgRoot = '%s'`, rc_c.GetStringVal("UID_OrgRoot"))
+				whereClause := fmt.Sprint(`UID_OrgRoot = '%s'`, rc_c.GetStringVal("UID_OrgRoot"))
 				encodeRoles(config, rc_c.DBContext, rc_c.Writer,
 					"Org", whereClause,
 					"Role",
@@ -740,12 +905,12 @@ func encodeRoleClasses(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 func encodeConfigParameters(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("DialogConfigParm")
-	rows, err := dbx.GetAllTableRows(db, "DialogConfigParm")
+	rows, err := dbx.GetAllCachedTableRows(db, "DialogConfigParm", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("ConfigParam", db, rows, o,
+	return exml.EncodeTable("ConfigParam", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs: makeAttrFn(map[string]string{
 				"id":        "UID_ConfigParm",
@@ -791,6 +956,7 @@ func encodeDynamicRoleContent(config ExporterConfig, dg_c *exml.TableContext, ke
 		exml.EncodeMatchingRows(dg_c.DBContext, "DialogColumn", wc_col,
 			"RecalcProperty",
 			dg_c.Writer,
+			config.DBConfig.CachedTables,
 			exml.EncodingOptions{
 				PluralObjectName: "RecalcProperties",
 				NoContent:        true,
@@ -826,12 +992,12 @@ func encodeDynamicRoleContent(config ExporterConfig, dg_c *exml.TableContext, ke
 func encodeServers(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("QBMServer")
-	rows, err := dbx.GetAllTableRows(db, "QBMServer")
+	rows, err := dbx.GetAllCachedTableRows(db, "QBMServer", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("Server", db, rows, o,
+	return exml.EncodeTable("Server", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs: makeAttrFn(map[string]string{
 				"id":               "UID_QBMServer",
@@ -853,6 +1019,7 @@ func encodeServerContent(dt_c *exml.TableContext) {
 	exml.EncodeMatchingRows(dt_c.DBContext, "QBMDeployTarget", wc,
 		"DeployTarget",
 		dt_c.Writer,
+		dt_c.CachedTables,
 		exml.EncodingOptions{
 			NoContent: true,
 			F_Attrs: makeAttrFn(map[string]string{
@@ -868,6 +1035,7 @@ func encodeServerContent(dt_c *exml.TableContext) {
 	exml.EncodeMatchingRows(dt_c.DBContext, "QBMServerTag", wc,
 		"ServerTag",
 		dt_c.Writer,
+		dt_c.CachedTables,
 		exml.EncodingOptions{
 			NoContent: true,
 			F_Attrs: makeAttrFn(map[string]string{
@@ -882,12 +1050,12 @@ func encodeServerContent(dt_c *exml.TableContext) {
 func encodeWebApps(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("QBMWebApplication")
-	rows, err := dbx.GetAllTableRows(db, "QBMWebApplication")
+	rows, err := dbx.GetAllCachedTableRows(db, "QBMWebApplication", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("WebApp", db, rows, o,
+	return exml.EncodeTable("WebApp", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs: func(wa_c *exml.TableContext) ([]xml.Attr, error) {
 				baseAttrs, _ := exml.MakeXMLAttrs(wa_c.Row, oneim.MAP_Metadata)
@@ -966,12 +1134,12 @@ func stdWDAttrs(c *exml.TableContext) ([]xml.Attr, error) {
 func encodeWebDesignerObjects(config ExporterConfig, db *sqlx.DB, wdType string, xmlName string, o io.Writer) error {
 
 	config.dbg("DialogAEDS: " + wdType)
-	rows, err := dbx.GetTableRows(db, "DialogAEDS", fmt.Sprintf("ObjectType = '%s'", wdType))
+	rows, err := dbx.GetCachedTableRows(db, "DialogAEDS", fmt.Sprintf("ObjectType = '%s'", wdType), config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	exml.EncodeTable(xmlName, db, rows, o,
+	exml.EncodeTable(xmlName, db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			NoContent: true,
 			F_Attrs:   stdWDAttrs,
@@ -1010,12 +1178,12 @@ func encodeWebDesignerObjects(config ExporterConfig, db *sqlx.DB, wdType string,
 func encodeSchedules(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("DialogSchedule")
-	rows, err := dbx.GetAllTableRows(db, "DialogSchedule")
+	rows, err := dbx.GetAllCachedTableRows(db, "DialogSchedule", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("Schedule", db, rows, o,
+	return exml.EncodeTable("Schedule", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs: makeAttrFn(map[string]string{
 				"id":                 "UID_DialogSchedule",
@@ -1084,7 +1252,7 @@ func encodeITShops(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 	config.dbg("ITShopOrg")
 
 	// load all shopping centers into temp DB
-	rows, err := dbx.GetTableRows(db, "ITShopOrg", "ITShopInfo = 'SC'")
+	rows, err := dbx.GetCachedTableRows(db, "ITShopOrg", "ITShopInfo = 'SC'", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
@@ -1106,7 +1274,7 @@ func encodeITShops(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("  ... temp DB created")
 
-	return exml.EncodeMatchingRows(tempDB, tableName, "1=1", "ShoppingCenter", o,
+	return exml.EncodeMatchingRows(tempDB, tableName, "1=1", "ShoppingCenter", o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs: makeAttrFn(map[string]string{
 				"id":       "UID_ITShopOrg",
@@ -1123,6 +1291,7 @@ func encodeITShops(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 				exml.EncodeMatchingRows(c.DBContext,
 					"ITShopOrg", wc_shop, "Shop",
 					c.Writer,
+					config.DBConfig.CachedTables,
 					exml.EncodingOptions{
 						F_Attrs: stdITShopAttrs,
 						F_Content: func(sh_c *exml.TableContext) {
@@ -1150,6 +1319,7 @@ func encodeITShopShopContent(config ExporterConfig, c *exml.TableContext) {
 	exml.EncodeMatchingRows(c.DBContext,
 		"ITShopOrg", wc_shelf, "Shelf",
 		c.Writer,
+		config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			PluralObjectName: "Shelves",
 			F_Attrs:          stdITShopAttrs,
@@ -1162,6 +1332,7 @@ func encodeITShopShopContent(config ExporterConfig, c *exml.TableContext) {
 				exml.EncodeMatchingRows(bo_c.DBContext,
 					"ITShopOrg", wc_product, "Product",
 					bo_c.Writer,
+					config.DBConfig.CachedTables,
 					exml.EncodingOptions{
 						F_Attrs: stdITShopAttrs,
 						F_Content: func(product_c *exml.TableContext) {
@@ -1181,6 +1352,7 @@ func encodeITShopShopContent(config ExporterConfig, c *exml.TableContext) {
 	exml.EncodeMatchingRows(c.DBContext,
 		"ITShopOrg", wc_cust, "Customer",
 		c.Writer,
+		config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			NoContent: true,
 			F_Attrs:   stdITShopAttrs,
@@ -1242,12 +1414,12 @@ func encodeITShopOrgContent(c *exml.TableContext) {
 
 func encodeITShopCatalog(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
-	rows, err := dbx.GetAllTableRows(db, "AccProductGroup")
+	rows, err := dbx.GetAllCachedTableRows(db, "AccProductGroup", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("CatalogGroup", db, rows, o,
+	return exml.EncodeTable("CatalogGroup", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs: makeAttrFn(map[string]string{
 				"id":            "UID_AccProductGroup",
@@ -1319,6 +1491,7 @@ func encodeCatalogItemContent(config ExporterConfig, p_c *exml.TableContext) {
 	exml.EncodeMatchingRows(p_c.DBContext,
 		"ITShopOrg", wc_itshop, "ITShopOrg",
 		p_c.Writer,
+		config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			NoContent: true,
 			F_Attrs:   stdITShopAttrs,
@@ -1334,12 +1507,12 @@ func encodeCatalogItemContent(config ExporterConfig, p_c *exml.TableContext) {
 func encodeApprovalPolicies(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("PWODecisionMethod")
-	rows, err := dbx.GetAllTableRows(db, "PWODecisionMethod")
+	rows, err := dbx.GetAllCachedTableRows(db, "PWODecisionMethod", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("ApprovalPolicy", db, rows, o,
+	return exml.EncodeTable("ApprovalPolicy", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			PluralObjectName: "ApprovalPolicies",
 			F_Attrs: makeAttrFn(map[string]string{
@@ -1378,12 +1551,12 @@ func encodeApprovalWorkflowRef(ap_c *exml.TableContext, dmID string, wfName stri
 
 func encodeApprovalWorkflows(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
-	rows, err := dbx.GetAllTableRows(db, "PWODecisionSubMethod")
+	rows, err := dbx.GetAllCachedTableRows(db, "PWODecisionSubMethod", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("ApprovalWorkflow", db, rows, o,
+	return exml.EncodeTable("ApprovalWorkflow", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs: makeAttrFn(map[string]string{
 				"id":          "UID_PWODecisionSubMethod",
@@ -1460,12 +1633,12 @@ func encodeApprovalStepContent(c *exml.TableContext) {
 
 func encodeApprovalRules(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
-	rows, err := dbx.GetAllTableRows(db, "PWODecisionRule")
+	rows, err := dbx.GetAllCachedTableRows(db, "PWODecisionRule", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("ApprovalDecisionRule", db, rows, o,
+	return exml.EncodeTable("ApprovalDecisionRule", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			NoContent: true,
 			F_Attrs: makeAttrFn(map[string]string{
@@ -1524,12 +1697,12 @@ func encodeEmailTemplateRef(c *exml.TableContext, keyColumn string, xmlName stri
 func encodeAccountDefinitions(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("TSBAccountDef")
-	rows, err := dbx.GetAllTableRows(db, "TSBAccountDef")
+	rows, err := dbx.GetAllCachedTableRows(db, "TSBAccountDef", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("AccountDefinition", db, rows, o,
+	return exml.EncodeTable("AccountDefinition", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs: makeAttrFn(
 				map[string]string{"id": "UID_TSBAccountDef", "name": "Ident_TSBAccountDef"},
@@ -1633,24 +1806,7 @@ func encodeAccountDefITDataContent(c *exml.TableContext) error {
 								},
 							)
 
-							exml.EncodeForeignSingleton(itd_c,
-								"BaseTree", "UID_Org", "Structure",
-								exml.EncodingOptions{
-									NoContent: true,
-									F_Attrs:   stdOrgAttrs,
-									F_Content: func(bt_c *exml.TableContext) {
-										exml.EncodeFKReference(bt_c,
-											"OrgRoot", "UID_OrgRoot", "Type",
-											exml.EncodingOptions{
-												NoContent: true,
-												F_Attrs: makeAttrFn(map[string]string{
-													"name": "Ident_OrgRoot",
-												}),
-											},
-										)
-									},
-								},
-							)
+							encodeOrgReference(itd_c, "UID_Org", "Structure")
 
 						},
 					},
@@ -1667,12 +1823,12 @@ func encodeAccountDefITDataContent(c *exml.TableContext) error {
 func encodeAttestationPolicies(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("AttestationPolicy")
-	rows, err := dbx.GetAllTableRows(db, "AttestationPolicy")
+	rows, err := dbx.GetAllCachedTableRows(db, "AttestationPolicy", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("AttestationPolicy", db, rows, o,
+	return exml.EncodeTable("AttestationPolicy", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			PluralObjectName: "AttestationPolicies",
 			F_Attrs: makeAttrFn(map[string]string{
@@ -1849,12 +2005,12 @@ func encodeATTCaseSummary(c *exml.TableContext, whereClause string) {
 
 func encodeAttestationProcedures(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
-	rows, err := dbx.GetAllTableRows(db, "AttestationObject")
+	rows, err := dbx.GetAllCachedTableRows(db, "AttestationObject", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("AttestationProcedure", db, rows, o,
+	return exml.EncodeTable("AttestationProcedure", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs: makeAttrFn(map[string]string{
 				"id":   "UID_AttestationObject",
@@ -1920,12 +2076,12 @@ func encodeAttestationProcedures(config ExporterConfig, db *sqlx.DB, o io.Writer
 func encodeTargetSystems(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("UNSRoot")
-	rows, err := dbx.GetAllTableRows(db, "UNSRoot")
+	rows, err := dbx.GetAllCachedTableRows(db, "UNSRoot", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("TargetSystem", db, rows, o,
+	return exml.EncodeTable("TargetSystem", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			NoContent: true,
 			F_Attrs: makeAttrFn(map[string]string{
@@ -2041,12 +2197,12 @@ func encodeUNSContainerSummary(c *exml.TableContext, wc_root string) {
 func encodeSynchronizationProjects(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("DPRShell")
-	rows, err := dbx.GetAllTableRows(db, "DPRShell")
+	rows, err := dbx.GetAllCachedTableRows(db, "DPRShell", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("SyncProject", db, rows, o,
+	return exml.EncodeTable("SyncProject", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs: makeAttrFn(map[string]string{
 				"id":             "UID_DPRShell",
@@ -2431,12 +2587,12 @@ func stdRuleAttrs(c *exml.TableContext) ([]xml.Attr, error) {
 func encodeComplianceRules(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("ComplianceRule")
-	rows, err := dbx.GetTableRows(db, "ComplianceRule", "IsWorkingCopy = 0")
+	rows, err := dbx.GetCachedTableRows(db, "ComplianceRule", "IsWorkingCopy = 0", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("ComplianceRule", db, rows, o,
+	return exml.EncodeTable("ComplianceRule", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs:      stdRuleAttrs,
 			ExcludeAttrs: []string{"WhereClause", "WhereClausePerson", "WhereClausePersonAddOn"},
@@ -2477,6 +2633,7 @@ func encodeComplianceRules(config ExporterConfig, db *sqlx.DB, o io.Writer) erro
 				exml.EncodeMatchingRows(cr_c.DBContext, "PersonInNonCompliance", wc,
 					"Violation",
 					cr_c.Writer,
+					config.DBConfig.CachedTables,
 					exml.EncodingOptions{
 						SkipEmpty: true,
 						NoContent: true,
@@ -2505,12 +2662,12 @@ func encodeComplianceRules(config ExporterConfig, db *sqlx.DB, o io.Writer) erro
 func encodeSchema(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("DialogTable")
-	rows, err := dbx.GetTableRows(db, "DialogTable", "1=1")
+	rows, err := dbx.GetCachedTableRows(db, "DialogTable", "1=1", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("Table", db, rows, o,
+	return exml.EncodeTable("Table", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			MaxWorkers: config.MaxThreads,
 			NoContent:  true,
@@ -2608,12 +2765,12 @@ func encodeSchema(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 func encodeProcesses(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("Process")
-	rows, err := dbx.GetTableRows(db, "JobChain", "1=1")
+	rows, err := dbx.GetCachedTableRows(db, "JobChain", "1=1", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("Process", db, rows, o,
+	return exml.EncodeTable("Process", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			MaxWorkers:       config.MaxThreads,
 			PluralObjectName: "Processes",
@@ -2641,6 +2798,7 @@ func encodeProcesses(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 				exml.EncodeForeignTable(c,
 					"Job", "UID_JobChain", "Job",
 					exml.EncodingOptions{
+						MaxWorkers: config.MaxThreads,
 						ExcludeAttrs: []string{
 							"PreCode", "GenCondition",
 							"Description",
@@ -2808,12 +2966,12 @@ func encodeJobContent(c *exml.TableContext) {
 func encodeScripts(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("DialogScript")
-	rows, err := dbx.GetTableRows(db, "DialogScript", "1=1")
+	rows, err := dbx.GetCachedTableRows(db, "DialogScript", "1=1", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("Script", db, rows, o,
+	return exml.EncodeTable("Script", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			NoContent: true,
 			F_Attrs: makeAttrFn(
@@ -2831,12 +2989,12 @@ func encodeScripts(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 func encodeMailTemplates(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("DialogRichMail")
-	rows, err := dbx.GetTableRows(db, "DialogRichMail", "1=1")
+	rows, err := dbx.GetCachedTableRows(db, "DialogRichMail", "1=1", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("MailTemplate", db, rows, o,
+	return exml.EncodeTable("MailTemplate", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs: makeAttrFn(
 				map[string]string{"name": "Ident_DialogRichMail", "id": "UID_DialogRichMail"},
@@ -2881,12 +3039,12 @@ func encodeMailTemplates(config ExporterConfig, db *sqlx.DB, o io.Writer) error 
 func encodeLimitedSQL(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("QBMLimitedSQL")
-	rows, err := dbx.GetTableRows(db, "QBMLimitedSQL", "1=1")
+	rows, err := dbx.GetCachedTableRows(db, "QBMLimitedSQL", "1=1", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("LimitedSQLScript", db, rows, o,
+	return exml.EncodeTable("LimitedSQLScript", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			F_Attrs: makeAttrFn(
 				map[string]string{
@@ -2906,12 +3064,12 @@ func encodeLimitedSQL(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 func encodeChangeLabels(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 
 	config.dbg("DialogTag")
-	rows, err := dbx.GetTableRows(db, "DialogTag", "1=1")
+	rows, err := dbx.GetCachedTableRows(db, "DialogTag", "1=1", config.DBConfig.CachedTables)
 	if err != nil {
 		return err
 	}
 
-	return exml.EncodeTable("ChangeLabel", db, rows, o,
+	return exml.EncodeTable("ChangeLabel", db, rows, o, config.DBConfig.CachedTables,
 		exml.EncodingOptions{
 			NoContent: true,
 			F_Attrs:   stdTagAttrs,
@@ -2930,7 +3088,7 @@ func encodeChangeLabels(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
 					exml.EncodingOptions{
 						NoContent: true,
 						F_Attrs: makeAttrFn(
-							map[string]string{"id": "UID_TaggedItem"},
+							map[string]string{"id": "UID_DialogTaggedItem"},
 							[]string{"SortOrder", "IsDelete"},
 						),
 						F_Content: func(ti_c *exml.TableContext) {
@@ -2969,4 +3127,99 @@ func stdTagAttrs(c *exml.TableContext) ([]xml.Attr, error) {
 		[]string{"IsClosed"},
 	)
 	return f(c)
+}
+
+func encodeReports(config ExporterConfig, db *sqlx.DB, o io.Writer) error {
+
+	config.dbg("Reports")
+	rows, err := dbx.GetCachedTableRows(db, "DialogReport", "1=1", config.DBConfig.CachedTables)
+	if err != nil {
+		return err
+	}
+
+	return exml.EncodeTable("Report", db, rows, o, config.DBConfig.CachedTables,
+		exml.EncodingOptions{
+			NoContent: true,
+			F_Attrs: makeAttrFn(
+				map[string]string{
+					"name": "ReportName",
+					"id":   "UID_DialogReport",
+				},
+				[]string{"DisplayName", "MaxSecondsRuntime", "ReportClass"},
+			),
+			F_Content: func(r_c *exml.TableContext) {
+				exml.EncodeRowAttribute(r_c, "Description")
+				//exml.EncodeRowAttribute(r_c, "ReportDefinition", exml.EncodingOptions{RawXML: true})
+				encodeObjectPatches(r_c)
+				encodeRoleAssignments(config, r_c, "UID_DialogReport")
+
+				exml.EncodeForeignTable(r_c,
+					"DialogReportQuery", "UID_DialogReport", "Query",
+					exml.EncodingOptions{
+						PluralObjectName: "Queries",
+						F_Attrs: makeAttrFn(
+							map[string]string{
+								"name": "QueryName",
+								"id":   "UID_DialogReportQuery",
+							},
+							[]string{"SortOrder"},
+						),
+						ExcludeAttrs: []string{"ObjectWhereClause", "QueryDefinition"},
+						F_Content: func(rq_c *exml.TableContext) {
+							exml.EncodeRowAttribute(rq_c, "ObjectWhereClause")
+							exml.EncodeRowAttribute(rq_c, "QueryDefinition")
+							encodeTableReference(rq_c, "UID_DialogTableObject", "Table")
+							exml.EncodeFKReference(rq_c,
+								"DialogReportQueryModule", "UID_DialogReportQueryModule", "Module",
+								exml.EncodingOptions{
+									NoContent: true,
+									F_Attrs: makeAttrFn(
+										map[string]string{
+											"name": "Ident_DialogReportQueryModule",
+											"id":   "UID_DialogReportQueryModule",
+										},
+										[]string{"SortOrder", "DisplayValue", "ModuleAssembly", "ModuleClass"},
+									),
+								},
+							)
+						},
+					},
+				)
+
+				exml.EncodeForeignTable(r_c,
+					"RPSReport", "UID_DialogReport", "Subscription",
+					exml.EncodingOptions{
+						NoContent: true,
+						F_Attrs: makeAttrFn(
+							map[string]string{
+								"name": "Ident_RPSReport",
+								"id":   "UID_RPSReport",
+							},
+							[]string{"IsForITShop", "IsITShopOnly", "IsInActive", "IsListReport"},
+						),
+						F_Content: func(sub_c *exml.TableContext) {
+
+							exml.EncodeForeignTable(sub_c, "RPSSubscription", "UID_RPSReport", "Subscriber",
+								exml.EncodingOptions{
+									NoContent: true,
+									F_Attrs: makeAttrFn(
+										map[string]string{
+											"name": "Ident_RPSSubscription",
+											"id":   "UID_RPSSubscription",
+										},
+										[]string{"ExportFormat", "IsRejected"},
+									),
+									F_Content: func(subscriber_c *exml.TableContext) {
+										encodePersonReference(subscriber_c, "UID_Person", "Person")
+										encodeScheduleReference(subscriber_c, "UID_DialogSchedule", "Schedule")
+									},
+								},
+							)
+						},
+					},
+				)
+
+			},
+		},
+	)
 }

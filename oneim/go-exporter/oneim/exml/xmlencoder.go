@@ -11,7 +11,6 @@ import (
 	"regexp"
 	"slices"
 	"sort"
-	"strings"
 	"sync"
 
 	//    "compress/gzip"
@@ -33,6 +32,7 @@ type EncodingOptions struct {
 	ExcludeAttrs     []string
 	RawXML           bool // do not apply xml encoding to content
 	SkipEmpty        bool // if attribute is null, do not included in XML
+	NoCache          bool // ignore cached table data
 	PostFilter       func(*TableContext) bool
 	F_Attrs          func(c *TableContext) ([]xml.Attr, error)
 	F_Content        func(c *TableContext)
@@ -68,11 +68,12 @@ func (opt EncodingOptions) singleThread() EncodingOptions {
 
 // type passed to closure when processing one row of table
 type TableContext struct {
-	DBContext *sqlx.DB
-	Name      string
-	Row       *map[string]interface{}
-	Writer    io.Writer
-	Options   EncodingOptions
+	DBContext    *sqlx.DB
+	Name         string
+	Row          *map[string]interface{}
+	Writer       io.Writer
+	Options      EncodingOptions
+	CachedTables *map[string]*dbx.CachedTable
 }
 
 func (c *TableContext) GetStringVal(name string) string {
@@ -92,6 +93,19 @@ func NewTableContext(name string, attrs *map[string]interface{}, o io.Writer) *T
 	}
 
 	return &tc
+}
+
+// ==================================
+
+func startElement(name string, e *xml.Encoder, attrs []xml.Attr) *xml.StartElement {
+	elem := xml.StartElement{
+		Name: xml.Name{Local: name},
+		Attr: attrs,
+	}
+	e.EncodeToken(elem)
+	e.Flush()
+
+	return &elem
 }
 
 // =======================================================
@@ -149,11 +163,7 @@ func EncodeRow(context *TableContext, options EncodingOptions) ([]byte, error) {
 			return nil, err
 		}
 	}
-	elem := xml.StartElement{
-		Name: xml.Name{Local: context.Name},
-		Attr: attrs,
-	}
-	e.EncodeToken(elem)
+	elem := startElement(context.Name, e, attrs)
 
 	if !options.NoContent {
 
@@ -163,8 +173,7 @@ func EncodeRow(context *TableContext, options EncodingOptions) ([]byte, error) {
 		propElem := elem
 		if options.F_Content != nil {
 			propElemName := (context.Name + "Properties")
-			propElem = xml.StartElement{Name: xml.Name{Local: propElemName}}
-			e.EncodeToken(propElem)
+			propElem = startElement(propElemName, e, nil)
 		}
 
 		err := encodeRowProperties(context, e, options)
@@ -180,10 +189,15 @@ func EncodeRow(context *TableContext, options EncodingOptions) ([]byte, error) {
 
 	// generate embedded content
 	if options.F_Content != nil {
-		var childContext = TableContext{DBContext: context.DBContext,
-			Name:   context.Name,
-			Row:    context.Row,
-			Writer: writer}
+
+		var childContext = TableContext{
+			DBContext:    context.DBContext,
+			Name:         context.Name,
+			Row:          context.Row,
+			Writer:       writer,
+			CachedTables: context.CachedTables,
+		}
+
 		options.F_Content(&childContext)
 	}
 
@@ -230,6 +244,7 @@ func encodeRowProperties(context *TableContext, e *xml.Encoder, options Encoding
 func EncodeTable(tableName string,
 	db *sqlx.DB, rows *sqlx.Rows,
 	o io.Writer,
+	tcache *map[string]*dbx.CachedTable,
 	options EncodingOptions) error {
 
 	defer rows.Close()
@@ -241,22 +256,16 @@ func EncodeTable(tableName string,
 
 	// simple case of singleton
 	if options.IsSingleton {
-		return encodeTable_Singleton(tableName, db, rows, o, options)
+		return encodeTable_Singleton(tableName, db, rows, o, tcache, options)
 	} else if max_workers == 1 {
 		// single thread
-		return encodeTable_SingleThread(tableName, db, rows, o, options)
+		return encodeTable_SingleThread(tableName, db, rows, o, tcache, options)
 	}
 
 	// use multiple threads for encoding of n rows...
 
 	// create encoder XML output
 	e := xml.NewEncoder(o)
-
-	elem := xml.StartElement{
-		Name: xml.Name{Local: options.getPluralName(tableName)},
-	}
-	e.EncodeToken(elem)
-	e.Flush()
 
 	// channels for jobs/results
 	jobs := make(chan RowEncodingJob)
@@ -273,7 +282,16 @@ func EncodeTable(tableName string,
 	cwg.Add(1)
 	go EncodeRowResultCollector(tableName, results, o, &cwg)
 
+	var elem *xml.StartElement
+	if !options.SkipEmpty {
+		elem = startElement(options.getPluralName(tableName), e, nil)
+	}
 	for rows.Next() {
+
+		// non-empty, so start element
+		if elem == nil {
+			elem = startElement(options.getPluralName(tableName), e, nil)
+		}
 
 		buf := make(map[string]interface{})
 		err := rows.MapScan(buf)
@@ -282,7 +300,7 @@ func EncodeTable(tableName string,
 			return err
 		}
 
-		t_context := TableContext{DBContext: db, Name: tableName, Row: &buf, Writer: o}
+		t_context := TableContext{DBContext: db, Name: tableName, Row: &buf, Writer: o, CachedTables: tcache}
 
 		// if caller provided a filter function, apply it
 		f_checkRow := options.PostFilter
@@ -298,7 +316,9 @@ func EncodeTable(tableName string,
 	close(results)
 	cwg.Wait()
 
-	e.EncodeToken(elem.End())
+	if elem != nil {
+		e.EncodeToken(elem.End())
+	}
 	e.Flush()
 
 	return nil
@@ -307,18 +327,22 @@ func EncodeTable(tableName string,
 func encodeTable_SingleThread(tableName string,
 	db *sqlx.DB, rows *sqlx.Rows,
 	o io.Writer,
+	tcache *map[string]*dbx.CachedTable,
 	options EncodingOptions) error {
 
 	// create encoder XML output
 	e := xml.NewEncoder(o)
 
-	elem := xml.StartElement{
-		Name: xml.Name{Local: options.getPluralName(tableName)},
+	var elem *xml.StartElement
+	if !options.SkipEmpty {
+		elem = startElement(options.getPluralName(tableName), e, nil)
 	}
-	e.EncodeToken(elem)
-	e.Flush()
 
 	for rows.Next() {
+
+		if elem == nil {
+			elem = startElement(options.getPluralName(tableName), e, nil)
+		}
 
 		buf := make(map[string]interface{})
 		err := rows.MapScan(buf)
@@ -327,7 +351,7 @@ func encodeTable_SingleThread(tableName string,
 			return err
 		}
 
-		t_context := TableContext{DBContext: db, Name: tableName, Row: &buf, Writer: o}
+		t_context := TableContext{DBContext: db, Name: tableName, Row: &buf, Writer: o, CachedTables: tcache}
 
 		// if caller provided a filter function, apply it
 		f_checkRow := options.PostFilter
@@ -344,7 +368,9 @@ func encodeTable_SingleThread(tableName string,
 		}
 	}
 
-	e.EncodeToken(elem.End())
+	if elem != nil {
+		e.EncodeToken(elem.End())
+	}
 	e.Flush()
 
 	return nil
@@ -353,6 +379,7 @@ func encodeTable_SingleThread(tableName string,
 func encodeTable_Singleton(tableName string,
 	db *sqlx.DB, rows *sqlx.Rows,
 	o io.Writer,
+	tcache *map[string]*dbx.CachedTable,
 	options EncodingOptions) error {
 
 	if rows.Next() {
@@ -364,7 +391,7 @@ func encodeTable_Singleton(tableName string,
 			return s_err
 		}
 
-		s_context := TableContext{DBContext: db, Name: tableName, Row: &s_buf, Writer: o}
+		s_context := TableContext{DBContext: db, Name: tableName, Row: &s_buf, Writer: o, CachedTables: tcache}
 		s_bytes, e_err := EncodeRow(&s_context, options)
 		if e_err != nil {
 			log.Println(e_err)
@@ -379,37 +406,39 @@ func EncodeRelatedTable(context *TableContext,
 	sqlName string, whereClause string,
 	xmlName string,
 	options EncodingOptions) error {
-	return EncodeMatchingRows(context.DBContext, sqlName, whereClause, xmlName, context.Writer, options.singleThread())
+	return EncodeMatchingRows(context.DBContext, sqlName, whereClause, xmlName, context.Writer, context.CachedTables, options.singleThread())
 }
 
 func EncodeMatchingRows(db *sqlx.DB,
 	sqlName string, whereClause string,
 	xmlName string, o io.Writer,
+	tcache *map[string]*dbx.CachedTable,
 	options EncodingOptions) error {
 
 	//log.Println(whereClause)
 
-	rows, err := dbx.GetTableRows(db, sqlName, whereClause)
+	rows, err := dbx.GetCachedTableRows(db, sqlName, whereClause, tcache)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	return EncodeTable(xmlName, db, rows, o, options)
+	return EncodeTable(xmlName, db, rows, o, tcache, options)
 }
 
 func EncodeSingletonTable(db *sqlx.DB,
 	sqlName string, whereClause string,
 	xmlName string, o io.Writer,
+	tcache *map[string]*dbx.CachedTable,
 	options EncodingOptions) error {
 
-	rows, err := dbx.GetTableRows(db, sqlName, whereClause)
+	rows, err := dbx.GetCachedTableRows(db, sqlName, whereClause, tcache)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	return EncodeTable(xmlName, db, rows, o, options)
+	return EncodeTable(xmlName, db, rows, o, tcache, options)
 }
 
 func EncodeForeignSingleton(context *TableContext,
@@ -428,7 +457,7 @@ func EncodeForeignTable(context *TableContext,
 	options EncodingOptions) error {
 	var tableId = (*context.Row)[sharedColumn]
 	var whereClause = fmt.Sprintf("%s = '%s'", sharedColumn, tableId)
-	return EncodeMatchingRows(context.DBContext, sqlName, whereClause, tableName, context.Writer, options.singleThread())
+	return EncodeMatchingRows(context.DBContext, sqlName, whereClause, tableName, context.Writer, context.CachedTables, options.singleThread())
 }
 
 // include content from table with matching UID, different column name
@@ -437,7 +466,7 @@ func EncodeChildTable(context *TableContext,
 	options EncodingOptions) error {
 	var tableId = (*context.Row)[column]
 	var whereClause = fmt.Sprintf("%s = '%s'", foreignColumn, tableId)
-	return EncodeMatchingRows(context.DBContext, sqlName, whereClause, tableName, context.Writer, options.singleThread())
+	return EncodeMatchingRows(context.DBContext, sqlName, whereClause, tableName, context.Writer, context.CachedTables, options.singleThread())
 }
 
 // include content from assignment table, via m-to-n table
@@ -449,7 +478,7 @@ func EncodeMNTable(context *TableContext,
 	homeTableId := (*context.Row)[homeTableColumn]
 	wc := fmt.Sprintf("%[3]s in (select %[3]s from %[2]s where %[1]s = '%[4]s')", homeTableColumn, assignmentTableName, targetColumn, homeTableId)
 
-	return EncodeMatchingRows(context.DBContext, targetTableName, wc, xmlName, context.Writer, options.singleThread())
+	return EncodeMatchingRows(context.DBContext, targetTableName, wc, xmlName, context.Writer, context.CachedTables, options.singleThread())
 }
 
 // use given map of attribute name to DB column name, to create slice of xml attrs
@@ -522,6 +551,7 @@ func EncodeReference(context *TableContext,
 		table, whereClause,
 		xmlName,
 		context.Writer,
+		context.CachedTables,
 		singleton_options)
 }
 
@@ -692,7 +722,9 @@ func EncodeAttribute(o io.Writer, attr string, val string, options ...EncodingOp
 
 		if opt.RawXML {
 			// write raw content to element, removing xml declaration if present
-			rawContent := strings.Replace(val, `<?xml version="1.0" encoding="utf-8"?>`, "", 1)
+			re := regexp.MustCompile(`<\?xml [^>]*>`)
+			//rawContent := strings.Replace(val, `<?xml version="1.0" encoding="utf-8"?>`, "", 1)
+			rawContent := re.ReplaceAllString(val, "")
 			o.Write([]byte(fmt.Sprintf("<%s>%s</%s>", attr, rawContent, attr)))
 		} else {
 
@@ -745,11 +777,7 @@ func EncodeValuesAsElements(o io.Writer, xmlName string, values []string, option
 	// create encoder XML output
 	e := xml.NewEncoder(o)
 
-	pElem := xml.StartElement{
-		Name: xml.Name{Local: options.getPluralName(xmlName)},
-	}
-	e.EncodeToken(pElem)
-	e.Flush()
+	pElem := startElement(options.getPluralName(xmlName), e, nil)
 
 	for _, v := range values {
 		EncodeValueAsElement(o, xmlName, v, options)
@@ -762,7 +790,7 @@ func EncodeValuesAsElements(o io.Writer, xmlName string, values []string, option
 }
 
 func GetColumnValue(context *TableContext, tableName string, whereClause string, columnName string) (string, error) {
-	rows, err := dbx.GetTableRows(context.DBContext, tableName, whereClause)
+	rows, err := dbx.GetCachedTableRows(context.DBContext, tableName, whereClause, context.CachedTables)
 	if err != nil {
 		log.Println(err)
 		return "", err

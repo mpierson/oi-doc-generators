@@ -26,6 +26,7 @@ type DBConfig struct {
 	Port           int
 	DatabaseName   string
 	MaxConnections int
+	CachedTables   *map[string]*CachedTable
 }
 
 func CreateCtxFromStruct(config *DBConfig) (*sqlx.DB, error) {
@@ -65,6 +66,43 @@ func CreateCtx(
 	return db, nil
 }
 
+type CachedTable struct {
+	SourceTable string
+	DB          *sqlx.DB
+	TableName   string
+}
+
+// fetch cached table for given table name
+// returns nil
+func (dbc *DBConfig) GetCachedTable(name string) *CachedTable {
+
+	if dbc.CachedTables != nil {
+		ct, ok := (*dbc.CachedTables)[name]
+		if ok {
+			return ct
+		}
+		return nil
+	}
+	return nil
+}
+
+func CacheOneTable(db *sqlx.DB, name string) (*CachedTable, error) {
+	// DialogTaggedItem
+	rows, err := getTableRows(db, name, "1=1")
+	defer rows.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	cdb, n, err := PopulateTempDBFromRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	return &CachedTable{SourceTable: name, DB: cdb, TableName: n}, nil
+}
+
+// ===========================================
+
 func GetTableCount(db *sqlx.DB, table string, clause string) (int, error) {
 	count := -1
 	q := fmt.Sprintf("SELECT count(*) FROM %s WHERE %s", table, clause)
@@ -73,11 +111,25 @@ func GetTableCount(db *sqlx.DB, table string, clause string) (int, error) {
 	return count, nil
 }
 
-func GetTableRows(db *sqlx.DB, table string, clause string) (*sqlx.Rows, error) {
+func GetCachedTableRows(db *sqlx.DB, table string, clause string, cdb *map[string]*CachedTable) (*sqlx.Rows, error) {
+	if cdb != nil {
+		ct, ok := (*cdb)[table]
+		if ok {
+			//log.Println(fmt.Sprintf(" CACHE hit %s", table))
+			return getTableRows(ct.DB, ct.TableName, clause)
+		}
+	}
+
+	return getTableRows(db, table, clause)
+}
+
+func getTableRows(db *sqlx.DB, table string, clause string) (*sqlx.Rows, error) {
+	//	log.Println(fmt.Sprintf("SELECT * FROM %s WHERE %s", table, clause))
 	return db.Queryx(fmt.Sprintf("SELECT * FROM %s WHERE %s", table, clause))
 }
-func GetAllTableRows(db *sqlx.DB, table string) (*sqlx.Rows, error) {
-	return GetTableRows(db, table, "1=1")
+
+func GetAllCachedTableRows(db *sqlx.DB, table string, cdb *map[string]*CachedTable) (*sqlx.Rows, error) {
+	return GetCachedTableRows(db, table, "1=1", cdb)
 }
 
 // use maxRows=-1 to fetch all
@@ -91,7 +143,7 @@ func GetBufferedTableData(db *sqlx.DB, table string, clause string, maxRows int)
 	var r = make([]map[string]interface{}, bufSize)
 	count := 0
 
-	rows, err := GetTableRows(db, table, clause)
+	rows, err := getTableRows(db, table, clause)
 	if err != nil {
 		log.Println(err)
 		return r, err
@@ -177,33 +229,34 @@ func PopulateTempDBFromRows(rows *sqlx.Rows) (*sqlx.DB, string, error) {
 		return nil, "", fmt.Errorf("failed to create table: %w", err)
 	}
 
-	// Build INSERT statement
-	placeholders := make([]string, len(columns))
-	for i := range placeholders {
-		placeholders[i] = "?"
-	}
-	insertStmt := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
-		tableName,
-		strings.Join(columns, ", "),
-		strings.Join(placeholders, ", "))
-
-	// Prepare the insert statement
-	stmt, err := db.Prepare(insertStmt)
-	if err != nil {
-		db.Close()
-		return nil, "", fmt.Errorf("failed to prepare insert statement: %w", err)
-	}
-	defer stmt.Close()
-
 	// Iterate through rows and insert into Chai database
-	values := make([]interface{}, len(columns))
-	valuePtrs := make([]interface{}, len(columns))
-	for i := range values {
-		valuePtrs[i] = &values[i]
-	}
-
 	rowCount := 0
 	for rows.Next() {
+
+		// Build INSERT statement
+		placeholders := make([]string, len(columns))
+		for i := range placeholders {
+			placeholders[i] = "?"
+		}
+		insertStmt := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
+			tableName,
+			strings.Join(columns, ", "),
+			strings.Join(placeholders, ", "))
+
+		// Prepare the insert statement
+		stmt, err := db.Prepare(insertStmt)
+		if err != nil {
+			db.Close()
+			return nil, "", fmt.Errorf("failed to prepare insert statement: %w", err)
+		}
+		defer stmt.Close()
+
+		values := make([]interface{}, len(columns))
+		valuePtrs := make([]interface{}, len(columns))
+		for i := range values {
+			valuePtrs[i] = &values[i]
+		}
+
 		err = rows.Scan(valuePtrs...)
 		if err != nil {
 			db.Close()
@@ -246,6 +299,10 @@ func buildCreateTableStatement(tableName string, columns []string, columnTypes [
 				colType = "BOOLEAN"
 			case "BLOB", "BYTEA":
 				colType = "BLOB"
+			case "DATE":
+				colType = "DATE"
+			case "DATETIME":
+				colType = "TIMESTAMP"
 			default:
 				colType = "TEXT"
 			}
