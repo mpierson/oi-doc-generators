@@ -81,6 +81,8 @@ abstract: |
 # Summary
 
     <xsl:apply-templates select="$ext-project/project" />
+
+    <xsl:apply-templates select="PrimaryDatabase/metrics" />
     <xsl:apply-templates select="." mode="servers-summary" />
     <xsl:apply-templates select="$ext-project/project/environments" />
 
@@ -88,6 +90,7 @@ abstract: |
 ## Primary Database
 
 <xsl:apply-templates select="PrimaryDatabase" />
+<xsl:apply-templates select="Modules" />
 
 ## Job Servers
 
@@ -135,6 +138,10 @@ abstract: |
 # Organization Structures
 
 <xsl:apply-templates select="Departments|Locations|CostCenters" />
+
+# System Roles
+
+<xsl:apply-templates select="SystemRoles" mode="section" />
 
 # Business Roles
 
@@ -189,6 +196,7 @@ abstract: |
 
 <xsl:apply-templates select="ComplianceRules" />
 
+<xsl:apply-templates select="Reports" />
 
 # Password Policies
 
@@ -207,6 +215,17 @@ abstract: |
 
 </xsl:template>
 
+<xsl:template match="metrics">
+    <xsl:variable name="tile-labels">
+        <labels>
+            <label><xsl:value-of select="concat(Users, ' users')" /></label>
+            <label><xsl:value-of select="concat(Accounts, ' accounts')" /></label>
+            <label><xsl:value-of select="concat(Requests, ' self-service requests')" /></label>
+            <label><xsl:value-of select="concat(AttestationCases, ' attestation cases')" /></label>
+        </labels>
+    </xsl:variable>
+    <xsl:value-of select="ois:generate-SVG-tiles('', '', 850, 150, 2, '', $tile-labels)" />
+</xsl:template>
 
 <!-- ===== project ============================== -->
 
@@ -433,21 +452,36 @@ Rel_U(JS_<xsl:value-of select="@name" />, main_database, "uses", $tags="light")
 
 <xsl:template match="PrimaryDatabase">
 
-Identity Manager version
-: <xsl:value-of select="../@version" />
-
-Host name
-: <xsl:value-of select="@DataSource" />
-
-Schema
-: <xsl:value-of select="@InitialCatalog" />
-
-User name
-: <xsl:value-of select="@UserID" />
+    <xsl:value-of select="ois:markdown-definition('Identity Manager version', ../@version )" />
+    <xsl:value-of select="ois:markdown-definition('Host name', @DataSource)" />
+    <xsl:value-of select="ois:markdown-definition('Schema', @InitialCatalog)" />
+    <xsl:value-of select="ois:markdown-definition('User name', @UserID)" />
 
 
 </xsl:template>
 
+<xsl:template match="Modules">
+    <xsl:call-template name="ois:generate-table">
+        <xsl:with-param name="summary" select="'Summary of active modules.'" />
+        <xsl:with-param name="id" select="'summary-modules'" />
+        <xsl:with-param name="header"   >| Name        | Description | Version |</xsl:with-param>
+        <xsl:with-param name="separator">|:------------|:------------------|:---:|</xsl:with-param>
+        <xsl:with-param name="values">
+            <rows> 
+                <xsl:apply-templates select="Module" mode="table"> 
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
+        </xsl:with-param>
+    </xsl:call-template>
+</xsl:template>
+<xsl:template match="Module" mode="table">
+    <row>
+        <value><xsl:value-of select="@name"/></value>
+        <value><xsl:value-of select="@displayValue" /></value>
+        <value><xsl:value-of select="@moduleVersion" /></value>
+    </row>
+</xsl:template>
 
 
 <!-- ===== Mail Templates ======================= -->
@@ -487,11 +521,17 @@ User name
         <xsl:with-param name="header"   >| Name        | Description | Default? | Last Modified |</xsl:with-param>
         <xsl:with-param name="separator">|:------------|:------------|:--:|:-----|</xsl:with-param>
         <xsl:with-param name="values">
-            <rows> <xsl:apply-templates select="PasswordPolicy" mode="table" /> </rows>
+            <rows> 
+                <xsl:apply-templates select="PasswordPolicy" mode="table"> 
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
         </xsl:with-param>
     </xsl:call-template>
 
-    <xsl:apply-templates select="PasswordPolicy" mode="section" />
+    <xsl:apply-templates select="PasswordPolicy" mode="section">
+        <xsl:sort select="@name" />
+    </xsl:apply-templates>
 
 </xsl:template>
 
@@ -534,7 +574,9 @@ User name
     <xsl:call-template name="date-timeline-graphic">
         <xsl:with-param name="df-rows">
             <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and (
-                        @frequencyType = 'Year' or (@frequencyType = 'Month' and @frequency &gt; 4))]" mode="data.frame" />
+                        @frequencyType = 'Year' or (@frequencyType = 'Month' and @frequency &gt; 4))]" mode="data.frame">
+                <xsl:sort select="@id" />
+            </xsl:apply-templates>
         </xsl:with-param>
         <xsl:with-param name="start-date" select="'now()+3600*24*365; yday(range_start)&lt;-1; hour(range_start)&lt;-0'" />
         <xsl:with-param name="end-date" select="'range_start + years(4)'" />
@@ -551,7 +593,10 @@ User name
         <xsl:with-param name="id" select="'summary-schedules-yearly'" />
         <xsl:with-param name="unit" select="'Year'" />
         <xsl:with-param name="values">
-            <rows> <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and @frequencyType = 'Year']" mode="table" /> </rows>
+            <rows> <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and @frequencyType = 'Year']" mode="table">
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
         </xsl:with-param>
     </xsl:call-template>
 
@@ -561,7 +606,9 @@ User name
         <xsl:with-param name="df-rows">
             <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and 
                                     (contains('Year Month', @frequencyType)
-                                        or @frequencyType='Week' and @frequency > 2)]" mode="data.frame" />
+                                        or @frequencyType='Week' and @frequency > 2)]" mode="data.frame">
+                <xsl:sort select="@id" />
+            </xsl:apply-templates>
         </xsl:with-param>
         <xsl:with-param name="start-date" select="'now()+3600*24*28; mday(range_start)&lt;-1; hour(range_start)&lt;-0'" />
         <xsl:with-param name="end-date" select="'range_start + months(6)'" />
@@ -577,7 +624,10 @@ User name
         <xsl:with-param name="id" select="'summary-schedules-monthly'" />
         <xsl:with-param name="unit" select="'Month'" />
         <xsl:with-param name="values">
-            <rows> <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and @frequencyType = 'Month']" mode="table" /> </rows>
+            <rows> <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and @frequencyType = 'Month']" mode="table">
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
         </xsl:with-param>
     </xsl:call-template>
 
@@ -588,7 +638,9 @@ User name
         <xsl:with-param name="df-rows">
             <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and 
                                     (contains('Year Month Week', @frequencyType)
-                                        or @frequencyType='Day' and @frequency > 2)]" mode="data.frame" />
+                                        or @frequencyType='Day' and @frequency > 2)]" mode="data.frame">
+                <xsl:sort select="@id" />
+            </xsl:apply-templates>
         </xsl:with-param>
         <xsl:with-param name="start-date" select="'now()+3600*24*7; wday(range_start)&lt;-1; hour(range_start)&lt;-0'" />
         <xsl:with-param name="end-date" select="'range_start + weeks(4)'" />
@@ -604,7 +656,10 @@ User name
         <xsl:with-param name="id" select="'summary-schedules-weekly'" />
         <xsl:with-param name="unit" select="'Week'" />
         <xsl:with-param name="values">
-            <rows> <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and @frequencyType = 'Week']" mode="table" /> </rows>
+            <rows> <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and @frequencyType = 'Week']" mode="table">
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
         </xsl:with-param>
     </xsl:call-template>
 
@@ -613,7 +668,9 @@ User name
         <xsl:with-param name="df-rows">
             <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and 
                                     (contains('Year Month Week Day', @frequencyType)
-                                        or @frequencyType='Hour' and @frequency > 18)]" mode="data.frame" />
+                                        or @frequencyType='Hour' and @frequency > 18)]" mode="data.frame">
+                <xsl:sort select="@id" />
+            </xsl:apply-templates>
         </xsl:with-param>
         <xsl:with-param name="start-date" select="'now()+3600*24; hour(range_start)&lt;-0'" />
         <xsl:with-param name="end-date" select="'range_start + days(7)'" />
@@ -630,7 +687,10 @@ User name
         <xsl:with-param name="header"   >| Name        | Description | Type | Run Every n Days | Start Time | Time Zone |</xsl:with-param>
         <xsl:with-param name="separator">|:------------|:------------|:----|:---:|:--:|:--:|</xsl:with-param>
         <xsl:with-param name="values">
-            <rows> <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and @frequencyType = 'Day']" mode="table-day" /> </rows>
+            <rows> <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and @frequencyType = 'Day']" mode="table-day" >
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
         </xsl:with-param>
     </xsl:call-template>
 
@@ -639,7 +699,9 @@ User name
         <xsl:with-param name="df-rows">
             <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and 
                                     (contains('Year Month Week Day', @frequencyType)
-                                        or @frequencyType='Hour' and @frequency > 1)]" mode="data.frame" />
+                                        or @frequencyType='Hour' and @frequency > 1)]" mode="data.frame">
+                <xsl:sort select="@id" />
+            </xsl:apply-templates>
         </xsl:with-param>
         <xsl:with-param name="start-date" select="'now()+3600*24; minute(range_start)&lt;-0; hour(range_start)&lt;-0'" />
         <xsl:with-param name="end-date" select="'range_start + hours(48)'" />
@@ -655,7 +717,10 @@ User name
         <xsl:with-param name="header"   >| Name        | Description | Type | Run Every n Hours | Time Zone |</xsl:with-param>
         <xsl:with-param name="separator">|:------------|:------------|:----|:---:|:--:|</xsl:with-param>
         <xsl:with-param name="values">
-            <rows> <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and @frequencyType = 'Hour']" mode="table-hour" /> </rows>
+            <rows> <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and @frequencyType = 'Hour']" mode="table-hour">
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
         </xsl:with-param>
     </xsl:call-template>
 
@@ -665,7 +730,9 @@ User name
         <xsl:with-param name="df-rows">
             <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and 
                                     (contains('Year Month Week Day Hour', @frequencyType)
-                                        or @frequencyType='Min' and @frequency > 30)]" mode="data.frame" />
+                                        or @frequencyType='Min' and @frequency > 30)]" mode="data.frame">
+                <xsl:sort select="@id" />
+            </xsl:apply-templates>
         </xsl:with-param>
         <xsl:with-param name="start-date" select="'now() + 3600; minute(range_start)&lt;-0'" />
         <xsl:with-param name="end-date" select="'range_start + hours(12)'" />
@@ -683,14 +750,19 @@ User name
         <xsl:with-param name="header"   >| Name        | Description | Type | Run Every n Minutes | Time Zone |</xsl:with-param>
         <xsl:with-param name="separator">|:------------|:------------|:----|:---:|:--:|</xsl:with-param>
         <xsl:with-param name="values">
-            <rows> <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and @frequencyType = 'Min']" mode="table-hour" /> </rows>
+            <rows> <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and @frequencyType = 'Min']" mode="table-hour">
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
         </xsl:with-param>
     </xsl:call-template>
 
     <xsl:call-template name="date-timeline-graphic">
         <xsl:with-param name="df-rows">
             <xsl:apply-templates select="Schedule[lower-case(@enabled)='true' and 
-                                    (contains('Year Month Week Day Hour Min', @frequencyType))]" mode="data.frame" />
+                                    (contains('Year Month Week Day Hour Min', @frequencyType))]" mode="data.frame">
+                <xsl:sort select="@id" />
+            </xsl:apply-templates>
         </xsl:with-param>
         <xsl:with-param name="start-date" select="'now() + 3600; minute(range_start)&lt;-0'" />
         <xsl:with-param name="end-date" select="'range_start + hours(2)'" />
@@ -871,7 +943,9 @@ User name
                 <xsl:apply-templates select="Administrator[
                                                 not(starts-with(@name, 'Web'))
                                                 and starts-with(normalize-space(Property[@Field='Password']), 'P|E')
-                                            ]" mode="table" />
+                                            ]" mode="table">
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
             </rows>
         </xsl:with-param>
     </xsl:call-template>
@@ -1129,6 +1203,8 @@ Table: Summary of web applications {#tbl:summary-web-applications}
 </xsl:template>
 
 
+<!-- ===== System Roles  ======================= -->
+
 
 <!-- ===== Roles ======================= -->
 
@@ -1234,7 +1310,7 @@ Table: Summary of custom role classes {#tbl:summary-role-classes}
 <xsl:apply-templates select="Roles" mode="section" />
 
 </xsl:template>
-<xsl:template match="Roles|ApplicationRoles" mode="section">
+<xsl:template match="SystemRoles|Roles|ApplicationRoles" mode="section">
     <xsl:param name="custom-role-path" />
     <xsl:choose>
         <xsl:when test="count(child::*) &gt; 20">
@@ -1250,7 +1326,7 @@ Table: Summary of custom role classes {#tbl:summary-role-classes}
                 </xsl:otherwise>
             </xsl:choose>
         </xsl:when>
-        <xsl:when test="count(Role) &gt; 10">
+        <xsl:when test="count(Role) gt 10 or count(ApplicationRole) gt 10 or count(SystemRole) gt 10">
             <xsl:call-template name="ois:generate-table">
                 <xsl:with-param name="summary" select="concat('Summary of roles of class ', ../@name)" />
                 <xsl:with-param name="id" select="concat('summary-roles-', ../@id)" />
@@ -1260,23 +1336,30 @@ Table: Summary of custom role classes {#tbl:summary-role-classes}
                     >|:------------|:--:|:------|:--:|:---------|</xsl:with-param>
                 <xsl:with-param name="values">
                     <rows>
-                        <xsl:apply-templates select="Role" mode="table">
+                        <xsl:apply-templates select="Role|ApplicationRole|SystemRole" mode="table">
                             <xsl:sort select="@fullPath"/>
+                            <xsl:sort select="@displayName"/>
                         </xsl:apply-templates>
                     </rows>
                 </xsl:with-param>
             </xsl:call-template>
-            <xsl:apply-templates select="Role[UserCount &gt; 0]" mode="section"><xsl:sort select="@fullPath"/></xsl:apply-templates>
+            <xsl:apply-templates select="Role|ApplicationRole|SystemRole" mode="section">
+                <xsl:sort select="@fullPath"/>
+                <xsl:sort select="@displayName"/>
+            </xsl:apply-templates>
         </xsl:when>
         <xsl:otherwise>
-            <xsl:apply-templates select="Role" mode="section"><xsl:sort select="@fullPath"/></xsl:apply-templates>
+            <xsl:apply-templates select="Role|ApplicationRole|SystemRole" mode="section">
+                <xsl:sort select="@fullPath"/>
+                <xsl:sort select="@displayName"/>
+            </xsl:apply-templates>
         </xsl:otherwise>
     </xsl:choose>
 </xsl:template>
 
-<xsl:template match="Role|ApplicationRole|Department|Location|CostCenter" mode="section" >
+<xsl:template match="Role|ApplicationRole|Department|Location|CostCenter|SystemRole" mode="section" >
 
-    <xsl:value-of select="ois:markdown-heading-3(ois:is-null-string(@fullPath, '[name or path missing]'))" />
+    <xsl:value-of select="ois:markdown-heading-3(ois:ins(@fullPath, ois:ins(@displayName,'[name or path missing]')))" />
 
     <xsl:value-of select="ois:markdown-definition('Description', child::*/Property[@Field='Description'])" />
     <xsl:value-of select="ois:markdown-definition('Manager', Manager/@name)" />
@@ -1302,6 +1385,22 @@ Table: Summary of custom role classes {#tbl:summary-role-classes}
         <xsl:with-param name="header" select="'Assigned objects'" />
         <xsl:with-param name="values">
             <items> <xsl:apply-templates select="ObjectAssignments/ObjectAssignment" mode="list" /> </items>
+        </xsl:with-param>
+        <xsl:with-param name="max-size" select="20" />
+    </xsl:call-template>
+
+    <xsl:call-template name="ois:generate-markdown-list">
+        <xsl:with-param name="header" select="'Assigned entitlements'" />
+        <xsl:with-param name="values">
+            <items> <xsl:apply-templates select="AssignedEntitlements/AssignedEntitlement" mode="list" /> </items>
+        </xsl:with-param>
+        <xsl:with-param name="max-size" select="20" />
+    </xsl:call-template>
+
+    <xsl:call-template name="ois:generate-markdown-list">
+        <xsl:with-param name="header" select="'Assigned to objects'" />
+        <xsl:with-param name="values">
+            <items> <xsl:apply-templates select="AssignedToObjects/AssignedToObject" mode="list" /> </items>
         </xsl:with-param>
         <xsl:with-param name="max-size" select="20" />
     </xsl:call-template>
@@ -1344,6 +1443,24 @@ Table: Summary of custom role classes {#tbl:summary-role-classes}
                 AssignedObject/@accountName |
                 AssignedObject/@displayName
             )"/>
+        <xsl:text> (</xsl:text><xsl:value-of select="ois:get-origin-description(@origin)" /><xsl:text>)</xsl:text>
+    </value>
+</xsl:template>
+<xsl:template match="AssignedEntitlement" mode="list">
+    <value>
+        <xsl:text>[</xsl:text><xsl:value-of select="Entitlement/@table" /><xsl:text>] </xsl:text>
+        <xsl:value-of select="ois:escape-for-markdown(
+                Entitlement/@name | Entitlement/@displayName
+            )"/>
+        <xsl:text> (</xsl:text><xsl:value-of select="ois:get-origin-description(@xOrigin)" /><xsl:text>)</xsl:text>
+    </value>
+</xsl:template>
+<xsl:template match="AssignedToObject" mode="list">
+    <value>
+        <xsl:text>[</xsl:text><xsl:value-of select="AssignedTo/Type/@name" /><xsl:text>] </xsl:text>
+        <xsl:value-of select="ois:escape-for-markdown(
+            ois:ins(AssignedTo/@fullPath, ois:ins(AssignedTo/@displayName, AssignedTo/@name))
+        )"/>
         <xsl:text> (</xsl:text><xsl:value-of select="ois:get-origin-description(@origin)" /><xsl:text>)</xsl:text>
     </value>
 </xsl:template>
@@ -1539,7 +1656,11 @@ Table: Summary of custom role classes {#tbl:summary-role-classes}
     <xsl:call-template name="ois:generate-markdown-list">
         <xsl:with-param name="header" select="'Assigned approval policies'" />
         <xsl:with-param name="values">
-            <items> <xsl:apply-templates select="PWODecisionMethods/PWODecisionMethod" mode="list" /> </items>
+            <items> 
+                <xsl:apply-templates select="PWODecisionMethods/PWODecisionMethod" mode="list"> 
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </items>
         </xsl:with-param>
     </xsl:call-template>
 
@@ -1677,7 +1798,7 @@ Table: Summary of custom role classes {#tbl:summary-role-classes}
     <branch>
         <xsl:attribute name="name" select="@name" />
         <xsl:attribute name="path" select="@fullPath" />
-        <xsl:attribute name="color" select="$OI_BROWN" />
+        <xsl:attribute name="color" select="$OI_NEPAL" />
         <xsl:apply-templates select="Customers/Customer" mode="branch" />
         <xsl:apply-templates select="ApprovalPolicies/ApprovalPolicy" mode="branch">
             <xsl:sort select="@name" order="ascending" />
@@ -1691,14 +1812,14 @@ Table: Summary of custom role classes {#tbl:summary-role-classes}
     <branch>
         <xsl:attribute name="name" select="@name" />
         <xsl:attribute name="path" select="@fullPath" />
-        <xsl:attribute name="color" select="$OI_GREEN" />
+        <xsl:attribute name="color" select="$OI_JAFFA" />
     </branch>
 </xsl:template>
 <xsl:template match="Shelf" mode="branch">
     <branch>
         <xsl:attribute name="name" select="@name" />
         <xsl:attribute name="path" select="@fullPath" />
-        <xsl:attribute name="color" select="$OI_BROWN" />
+        <xsl:attribute name="color" select="$OI_NEPAL" />
         <xsl:apply-templates select="ApprovalPolicies/ApprovalPolicy" mode="branch">
             <xsl:sort select="@name" order="ascending" />
         </xsl:apply-templates>
@@ -1708,7 +1829,7 @@ Table: Summary of custom role classes {#tbl:summary-role-classes}
     <branch>
         <xsl:attribute name="name" select="@name" />
         <xsl:attribute name="path" select="concat(../../@fullPath,'\', 'Approval policy: ',  @name)" />
-        <xsl:attribute name="color" select="$OI_RED" />
+        <xsl:attribute name="color" select="$OI_PEAR" />
     </branch>
 </xsl:template>
 
@@ -1731,7 +1852,9 @@ Table: Summary of customized approval policies {#tbl:summary-approval-policies-<
     /> |                 
 </xsl:for-each>   
 
-<xsl:apply-templates select="ApprovalPolicy[@usage=$usage]" />
+<xsl:apply-templates select="ApprovalPolicy[@usage=$usage]">
+    <xsl:sort select="@name" />
+</xsl:apply-templates>
 
 </xsl:template>
 <xsl:template match="ApprovalPolicy">
@@ -1788,7 +1911,9 @@ Table: Summary of approval workflows {#tbl:summary-approval-workflows-<xsl:value
     /> |                 
 </xsl:for-each>   
 
-<xsl:apply-templates select="ApprovalWorkflow[@usage=$usage]" />
+<xsl:apply-templates select="ApprovalWorkflow[@usage=$usage]">
+    <xsl:sort select="@name" />
+</xsl:apply-templates>
 
 </xsl:template>
 <xsl:template match="ApprovalWorkflow">
@@ -2088,7 +2213,9 @@ Table: Summary of approval workflows {#tbl:summary-approval-workflows-<xsl:value
         </xsl:with-param>
     </xsl:call-template>
 
-    <xsl:apply-templates select="ApprovalDecisionRule" />
+    <xsl:apply-templates select="ApprovalDecisionRule[@usage=$usage]"> 
+        <xsl:sort select="@name" order="ascending"/>
+    </xsl:apply-templates>
 
 </xsl:template>
 <xsl:template match="ApprovalDecisionRule" mode="table-row">
@@ -2223,7 +2350,7 @@ Table: Summary of approval workflows {#tbl:summary-approval-workflows-<xsl:value
     <branch>
         <xsl:attribute name="name" select="@name" />
         <xsl:attribute name="path" select="@fullPath" />
-        <xsl:attribute name="color" select="$OI_BROWN" />
+        <xsl:attribute name="color" select="$OI_NEPAL" />
     </branch>
 </xsl:template>
 
@@ -2477,8 +2604,8 @@ Table: Summary of account definitions {#tbl:summary-account-definitions}
     <xsl:value-of select="ois:markdown-definition('Table', Table/@name)" /> 
     <xsl:value-of select="ois:markdown-definition('Target system', 
             concat(TargetSystem/@table, ':', TargetSystem/@name))" /> 
-    <xsl:value-of select="ois:markdown-definition('Default behavior', DefaultBehavior/@name)" /> 
-    <xsl:value-of select="ois:markdown-definition('Automatic assignment', @isAutoAssignToPerson)" /> 
+
+    <xsl:apply-templates select="AccountDefinitionProperties" mode="aligned-list" />
 
     <xsl:value-of select="ois:markdown-heading-3( 'Manage Levels' )" />
 
@@ -2525,6 +2652,24 @@ Table: Summary of account definitions {#tbl:summary-account-definitions}
     </xsl:apply-templates>
 
 </xsl:if>
+</xsl:template>
+
+<xsl:template match="AccountDefinitionProperties" mode="aligned-list">
+    <xsl:call-template name="ois:generate-markdown-aligned-list">
+        <xsl:with-param name="values">
+            <items>
+                <value name="Default behaviour"><xsl:value-of select="../DefaultBehavior/@name" /></value>
+                <value name="Auto-assign to identities"><xsl:value-of select="Property[@Field='IsAutoAssignToPerson']" /></value>
+                <value name="Used in IT Shop"><xsl:value-of select="Property[@Field='IsForITShop']" /></value>
+                <value name="For IT Shop only"><xsl:value-of select="Property[@Field='IsITShopOnly']" /></value>
+                <value name="Retain account if temporarily disabled"><xsl:value-of select="Property[@Field='PTDInheritAccountDef']" /></value>
+                <value name="Retain account if permanently disabled "><xsl:value-of select="Property[@Field='PFDInheritAccountDef']" /></value>
+                <value name="Retain account on deferred deletion"><xsl:value-of select="Property[@Field='PMDInheritAccountDef']" /></value>
+                <value name="Retain account on security risk"><xsl:value-of select="Property[@Field='PSIInheritAccountDef']" /></value>
+            </items>
+        </xsl:with-param>
+        <xsl:with-param name="separator" select="'|:------|:--|'" />
+    </xsl:call-template>
 </xsl:template>
 
 <xsl:template match="Behavior">
@@ -3224,6 +3369,79 @@ Table: Synchronization steps for <xsl:value-of select="@name" /> {#tbl:synchroni
         <value><xsl:value-of select="Approver/@fullName"/></value>
         <value><xsl:value-of select="@decisionDate"/></value>
         <value><xsl:value-of select="ois:encode-breaks-for-markdown-table(DecisionReason)"/></value>
+    </row>
+</xsl:template>
+
+<!-- ==== Reports =========================== -->
+
+<xsl:template match="Reports">
+
+    <xsl:if test="count(Report[count(Subscriptions/Subscription) gt 0]) &gt; 0">
+        <xsl:value-of select="ois:markdown-heading-1('Reports')" />
+    </xsl:if>
+
+       <xsl:call-template name="ois:generate-table">
+        <xsl:with-param name="summary" select="'Summary of subscribeable reports.'" />
+        <xsl:with-param name="id" select="'summary-reports'" />
+        <xsl:with-param name="header"   >| Name        | Description | Type |</xsl:with-param>
+        <xsl:with-param name="separator">|:------------|:------------|:---:|</xsl:with-param>
+        <xsl:with-param name="values">
+            <rows>
+                <xsl:apply-templates select="Report[count(Subscriptions/Subscription) gt 0]" mode="table">
+                    <xsl:sort select="@reportClass" />
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
+        </xsl:with-param>
+    </xsl:call-template>
+
+    <xsl:apply-templates select="Report[count(Subscriptions/Subscription/Subscribers/Subscriber) gt 0]"> 
+        <xsl:sort select="@name"  order="ascending" />
+    </xsl:apply-templates>
+</xsl:template>
+<xsl:template match="Report" mode="table">
+    <row>
+        <value><xsl:value-of select="@name"/></value>
+        <value><xsl:value-of select="Description"/></value>
+        <value><xsl:value-of select="@reportClass" /></value>
+    </row>
+</xsl:template>
+
+<xsl:template match="Report">
+    <xsl:value-of select="ois:markdown-heading-2(concat('Report: ', @name))" />
+    <xsl:value-of select="ois:markdown-definition('Display name', @displayName)" />
+    <xsl:value-of select="ois:markdown-definition('Class', @reportClass)" />
+    <xsl:value-of select="ois:markdown-definition('Description', Description)" />
+    <xsl:value-of select="ois:markdown-definition-int('Runtime limit (sec)', @maxSecondsRuntime)" />
+
+    <xsl:apply-templates select="Subscriptions"/>
+
+</xsl:template>
+
+<xsl:template match="Subscriptions">
+    <xsl:if test="count(Subscription) gt 0">
+        <xsl:value-of select="ois:markdown-heading-3('Subscriptions')" />
+    </xsl:if>
+    <xsl:call-template name="ois:generate-table">
+        <xsl:with-param name="summary" select="concat('Subscribeable reports for _', ../@name, '_')" />
+        <xsl:with-param name="id" select="concat('report-subscribe-', ../@id)" />
+        <xsl:with-param name="header" select="'| Name | List report? | Subscribers |'" />
+        <xsl:with-param name="separator" select="'|:-------|:--:|:--:|'" />
+        <xsl:with-param name="values">
+            <rows>
+                <xsl:apply-templates select="Subscription" mode="table">
+                    <xsl:sort select="count(Subscribers/Subscriber)" />
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
+        </xsl:with-param>
+    </xsl:call-template>
+</xsl:template>
+<xsl:template match="Subscription" mode="table">
+    <row>
+        <value><xsl:value-of select="@name" /></value>
+        <value><xsl:value-of select="@isListReport" /></value>
+        <value><xsl:value-of select="count(Subscribers/Subscriber)" /></value>
     </row>
 </xsl:template>
 

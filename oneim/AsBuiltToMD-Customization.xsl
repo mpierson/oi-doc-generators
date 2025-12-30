@@ -63,6 +63,9 @@ abstract: |
 # Mail Templates
 <xsl:apply-templates select="MailTemplates" />
 
+# Reports
+<xsl:apply-templates select="Reports" />
+
 # Predefined SQL
 <xsl:apply-templates select="LimitedSQLScripts" />
 
@@ -526,7 +529,9 @@ abstract: |
             <rows> <xsl:apply-templates select="Processes/Process[ois:has-custom(.)]" mode="table"><xsl:sort select="@name" order="ascending" /></xsl:apply-templates> </rows>
         </xsl:with-param>
     </xsl:call-template>
-    <xsl:apply-templates select="Process[ois:has-custom(.)]" />
+    <xsl:apply-templates select="Process[ois:has-custom(.)]">
+        <xsl:sort select="@name" />
+    </xsl:apply-templates>
 
 </xsl:template>
 <xsl:template match="Process">
@@ -584,7 +589,9 @@ abstract: |
             </xsl:call-template>
 
 
-            <xsl:apply-templates select="Jobs/Job" mode="section" />
+            <xsl:apply-templates select="Jobs/Job" mode="section">
+                <xsl:sort select="@name" />
+            </xsl:apply-templates>
         </xsl:otherwise><!-- not noGenerate -->
     </xsl:choose>
 
@@ -918,7 +925,11 @@ abstract: |
         <xsl:with-param name="header"   >| Name        | Description | Format | Table | Last Modified |</xsl:with-param>
         <xsl:with-param name="separator">|:------------|:------------|:---:|:-----|:-----|</xsl:with-param>
         <xsl:with-param name="values">
-            <rows> <xsl:apply-templates select="MailTemplate" mode="table" /> </rows>
+            <rows> 
+                <xsl:apply-templates select="MailTemplate" mode="table"> 
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
         </xsl:with-param>
     </xsl:call-template>
 
@@ -979,7 +990,7 @@ Table: Summary of custom scripts {#tbl:summary-scripts}
     /> |                 
 </xsl:for-each>   
 
-<xsl:apply-templates select="Script[ois:has-custom(.)]" />
+<xsl:apply-templates select="Script[ois:has-custom(.)]"><xsl:sort select="@name" /></xsl:apply-templates>
 </xsl:if>
 
 </xsl:template>
@@ -996,6 +1007,108 @@ Table: Summary of custom scripts {#tbl:summary-scripts}
     </xsl:call-template>
 </xsl:template>
 
+<!-- ===== Reports ======================= -->
+
+<xsl:template match="Reports">
+
+    <xsl:call-template name="ois:generate-table">
+        <xsl:with-param name="summary" select="'Summary of formal reports.'" />
+        <xsl:with-param name="id" select="'summary-reports'" />
+        <xsl:with-param name="header"   >| Name        | Description | Type |</xsl:with-param>
+        <xsl:with-param name="separator">|:------------|:------------|:---:|</xsl:with-param>
+        <xsl:with-param name="values">
+            <rows> 
+                <xsl:apply-templates select="Report" mode="table"> 
+                    <xsl:sort select="@reportClass" />
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
+        </xsl:with-param>
+    </xsl:call-template>
+
+    <xsl:apply-templates select="Report[ois:has-custom(.) or count(Subscriptions/Subscription/Subscribers/Subscriber) gt 0]" />
+
+</xsl:template>
+<xsl:template match="Report" mode="table">
+    <row>
+        <value><xsl:value-of select="@name"/></value>
+        <value><xsl:value-of select="Description"/></value>
+        <value><xsl:value-of select="@reportClass" /></value>
+    </row>
+</xsl:template>
+
+<xsl:template match="Report">
+    <xsl:value-of select="ois:markdown-heading-2(concat('Report: ', @name))" />
+    <xsl:value-of select="ois:markdown-definition('Display name', @displayName)" />
+    <xsl:value-of select="ois:markdown-definition('Class', @reportClass)" />
+    <xsl:value-of select="ois:markdown-definition('Description', Description)" />
+    <xsl:value-of select="ois:markdown-definition-int('Runtime limit (sec)', @maxSecondsRuntime)" />
+
+    <xsl:apply-templates select="Queries"/>
+    <xsl:apply-templates select="Subscriptions"/>
+
+</xsl:template>
+<xsl:template match="Queries">
+    <xsl:if test="count(Query) gt 0">
+        <xsl:value-of select="ois:markdown-heading-3('Queries')" />
+    </xsl:if>
+    <xsl:call-template name="ois:generate-table">
+        <xsl:with-param name="summary" select="concat('Queries for report _', ../@name, '_')" />
+        <xsl:with-param name="id" select="concat('report-queries-', ../@id)" />
+        <xsl:with-param name="header" select="'| Name | Module | Last Modified |'" />
+        <xsl:with-param name="separator" select="'|:-------|:-----|:---------|'" />
+        <xsl:with-param name="values">
+            <rows>
+                <xsl:apply-templates select="Query" mode="report-query-table">
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
+        </xsl:with-param>
+    </xsl:call-template>
+    <xsl:apply-templates select="Query" mode="report-query-section" />
+</xsl:template>
+<xsl:template match="Query" mode="report-query-section">
+    <xsl:value-of select="ois:markdown-heading-4(concat('Query: ', @name))" />
+    <xsl:value-of select="ois:markdown-definition('Module', Module/@name)" />
+    <xsl:value-of select="ois:markdown-definition('Table', Table/@name)" />
+    <xsl:value-of select="ois:markdown-definition-bool('Resolve foreign keys', QueryProperties/Property[@Field='ObjectResolveFKs'])" />
+    <xsl:value-of select="ois:markdown-definition-codeblock('Query definition', QueryDefinition, 'sql')" />
+    <xsl:value-of select="ois:markdown-definition-codeblock('Where clause', ObjectWhereClause, 'sql')" />
+</xsl:template>
+<xsl:template match="Query" mode="report-query-table">
+    <row>
+        <value><xsl:value-of select="@name" /></value>
+        <value><xsl:value-of select="Module/@name" /></value>
+        <value><xsl:value-of select="ois:last-modified(.)" /></value>
+    </row>
+</xsl:template>
+
+<xsl:template match="Subscriptions">
+    <xsl:if test="count(Subscription) gt 0">
+        <xsl:value-of select="ois:markdown-heading-3('Subscriptions')" />
+    </xsl:if>
+    <xsl:call-template name="ois:generate-table">
+        <xsl:with-param name="summary" select="concat('Subscribeable reports for _', ../@name, '_')" />
+        <xsl:with-param name="id" select="concat('report-subscribe-', ../@id)" />
+        <xsl:with-param name="header" select="'| Name | List report? | Subscribers |'" />
+        <xsl:with-param name="separator" select="'|:-------|:--:|:--:|'" />
+        <xsl:with-param name="values">
+            <rows>
+                <xsl:apply-templates select="Subscription" mode="table">
+                    <xsl:sort select="count(Subscribers/Subscriber)" />
+                    <xsl:sort select="@name" />
+                </xsl:apply-templates>
+            </rows>
+        </xsl:with-param>
+    </xsl:call-template>
+</xsl:template>
+<xsl:template match="Subscription" mode="table">
+    <row>
+        <value><xsl:value-of select="@name" /></value>
+        <value><xsl:value-of select="@isListReport" /></value>
+        <value><xsl:value-of select="count(Subscribers/Subscriber)" /></value>
+    </row>
+</xsl:template>
 
 <!-- ===== Limited SQL ======================= -->
 
@@ -1047,7 +1160,7 @@ Table: Summary of custom scripts {#tbl:summary-scripts}
         <xsl:with-param name="summary" select="'Summary of change labels.'" />
         <xsl:with-param name="id" select="'summary-change-labels'" />
         <xsl:with-param name="header"   >| Name        | Description | Type | Closed? | Changes | Date |</xsl:with-param>
-        <xsl:with-param name="separator">|:------------|:------------|:---:|:---:|:--:|:-----|</xsl:with-param>
+        <xsl:with-param name="separator">|:------------|:----------|:---:|:---:|:--:|:-------|</xsl:with-param>
         <xsl:with-param name="values">
             <rows> 
                 <xsl:apply-templates select="ChangeLabel" mode="table"> 
@@ -1075,7 +1188,13 @@ Table: Summary of custom scripts {#tbl:summary-scripts}
 <xsl:template match="ChangeLabel">
     <xsl:value-of select="ois:markdown-heading-2(@name)" />
 
-    <xsl:if test="count(distinct-values(TaggedChanges/TaggedChange/@XDateInserted)) gt 2">
+    <xsl:if test="
+            (
+                count(distinct-values(TaggedChanges/TaggedChange/@XDateInserted)) 
+                +
+                count(distinct-values(TaggedItems/TaggedItem/@XDateInserted)) 
+            ) gt 2
+        ">
         <xsl:variable name="events">
             <xsl:apply-templates select="." mode="events" />
         </xsl:variable>
@@ -1097,6 +1216,7 @@ Table: Summary of custom scripts {#tbl:summary-scripts}
             <rows> 
                 <xsl:apply-templates select="TaggedChanges/TaggedChange[Object]" mode="table"> 
                     <xsl:sort select="@sortOrder"  data-type="number" />
+                    <xsl:sort select="@id" />
                 </xsl:apply-templates>
             </rows>
         </xsl:with-param>
@@ -1112,6 +1232,7 @@ Table: Summary of custom scripts {#tbl:summary-scripts}
             <rows> 
                 <xsl:apply-templates select="TaggedItems/TaggedItem[Object]" mode="table"> 
                     <xsl:sort select="@sortOrder"  data-type="number" />
+                    <xsl:sort select="@id" />
                 </xsl:apply-templates>
             </rows>
         </xsl:with-param>
@@ -1129,8 +1250,12 @@ Table: Summary of custom scripts {#tbl:summary-scripts}
 
     <xsl:template match="ChangeLabel" mode="events">
         <events>
-            <xsl:apply-templates select="TaggedChanges/TaggedChange" mode="event" />
-            <xsl:apply-templates select="TaggedItems/TaggedItem" mode="event" />
+            <xsl:apply-templates select="TaggedChanges/TaggedChange" mode="event">
+                    <xsl:sort select="@id" />
+            </xsl:apply-templates>
+            <xsl:apply-templates select="TaggedItems/TaggedItem" mode="event">
+                    <xsl:sort select="@id" />
+            </xsl:apply-templates>
         </events>
     </xsl:template>
     <xsl:template match="TaggedChange|TaggedItem" mode="event">
@@ -1166,6 +1291,8 @@ Table: Summary of custom scripts {#tbl:summary-scripts}
                 count($o/descendant-or-self::Patches/Patch) &gt; 0
                 or
                 count($o/descendant-or-self::*[starts-with(@id, 'CCC')]) &gt; 0
+                or
+                count($o/descendant-or-self::TaggedChanges/TaggedChange) &gt; 0
         " />
       </xsl:function>
       <xsl:function name="ois:property-is-custom" as="xs:boolean">
