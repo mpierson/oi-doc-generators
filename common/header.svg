@@ -55,6 +55,13 @@ path.key-column {
 .event-marker-o { stroke: #cad4d7; stroke-width: 4; }
 .marker-label { font-family: Arial, sans-serif; font-size: 8px; fill: #00969f; font-weight: bold; }
 
+.tile-1 { fill: #82a7c5; }
+.tile-2 { fill: #fb4f14; }
+.tile-3 { fill: #ee8a54; }
+.tile-4 { fill: #00969f; }
+.tile-5 { fill: #77c8b3; }
+.tile-6 { fill: #cad4d7; }
+.tile-text { fill: white; font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; }
 
 </style>
 <defs>

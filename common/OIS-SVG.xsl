@@ -160,6 +160,24 @@
           ois:svg-end-e('text')
       ) " />
     </xsl:function>
+    <xsl:function name="ois:svg-rect" as="xs:string">
+      <xsl:param name="x" as="xs:double" />
+      <xsl:param name="y" as="xs:double" />
+      <xsl:param name="width" as="xs:double" />
+      <xsl:param name="height" as="xs:double" />
+      <xsl:param name="attrs" as="xs:string?" />
+      <xsl:value-of select="
+              concat( '&lt;', 'rect', ' ', 
+                  concat(
+                    ois:svg-attr('x', string($x)),
+                    ois:svg-attr('y', string($y)),
+                    ois:svg-attr('width', string($width)),
+                    ois:svg-attr('height', string($height)),
+                    $attrs
+                  ),
+              '/&gt;')
+      " />
+    </xsl:function>
 
 
     <!-- ===================================================== -->
@@ -275,7 +293,7 @@
 
         <!-- axis is measured in days, months, years ... -->
         <xsl:variable name="base-unit" select="if ( $duration-days lt 2 ) then 'none'
-                                                      else if ( $duration-days lt 20 ) then 'day'
+                                                      else if ( $duration-days lt 15 ) then 'day'
                                                       else if ( $duration-days lt 100 ) then 'week'
                                                       else 'month' " />
         <!-- based on base unit, calculate effective start and end dates -->
@@ -493,6 +511,85 @@
         " />
         <xsl:value-of select="concat($line, $txt)" />
 
+    </xsl:function>
+
+    <!-- ===================================================== -->
+
+    <!-- 
+        render tile for each label
+
+        <labels>
+            <label>this is some text</label>
+            ...
+        </labels>
+    -->
+    <xsl:function name="ois:generate-SVG-tiles" as="xs:string">
+        <xsl:param name="summary" as="xs:string" />
+        <xsl:param name="id" as="xs:string" />
+        <xsl:param name="width" as="xs:integer" />
+        <xsl:param name="height" as="xs:integer" />
+        <xsl:param name="columns" as="xs:integer" />
+        <xsl:param name="styles" as="xs:string" />
+        <xsl:param name="labels" />
+
+        <xsl:variable name="text-gap" select="10" as="xs:integer" />
+        <xsl:variable name="col-gap" select="10" as="xs:integer" />
+
+        <xsl:variable name="col-width" select="($width - $col-gap) div $columns - $col-gap" as="xs:double" />
+        <xsl:variable name="n-rows" select="count($labels/labels/label) idiv $columns + 1" />
+        <xsl:variable name="row-height" select="($height - $col-gap) div $n-rows - $col-gap" as="xs:double" />
+
+        <xsl:variable name="tile-classes" select="tokenize('tile-1 tile-2 tile-3 tile-4 tile-5 tile-6')"/>
+        <xsl:variable name="n-classes" select="count($tile-classes)" as="xs:integer" />
+
+        <xsl:variable name="rows">
+            <xsl:for-each select="$labels/labels/label">
+                <xsl:variable name="row" select="(position() - 1) idiv $columns " as="xs:integer" />
+                <xsl:variable name="column" select="(position() -1) mod $columns" as="xs:integer" />
+                <xsl:variable name="x" select="$col-gap + $column * ($col-width + $col-gap)" as="xs:double" />
+                <xsl:variable name="y" select="$height - $row-height - ($col-gap + $row * ($row-height + $col-gap))" as="xs:double" />
+                <xsl:variable name="n-class" select="(position() - 1) mod $n-classes + 1" as="xs:integer"/>
+                <xsl:variable name="class" select="$tile-classes[position() = $n-class]" as="xs:string" />
+                <xsl:value-of select="concat(
+                    ois:svg-rect($x, $y, $col-width, $row-height,
+                        concat(
+                            ois:svg-attr('style', 'stroke:2px;'),
+                            ois:svg-attr('class', $class),
+                            ois:svg-attr('rx', '5'),
+                            ois:svg-attr('ry', '5')
+
+                        )
+                    ),
+                    if ( string-length(.) gt 0 ) then 
+                        ois:svg-text($x + $col-width div 2, $y + $row-height div 2, ., 
+                            concat(
+                                ois:svg-attr('style', 'text-anchor: middle;'),
+                                ois:svg-attr('dominant-baseline', 'middle'),
+                                ois:svg-attr('class', 'tile-text')
+                            )
+                        )
+                    else ''
+                )" />
+            </xsl:for-each>
+        </xsl:variable>
+
+
+        <xsl:variable name="result">
+            <xsl:if test="count(distinct-values($labels/labels/label)) gt 0">
+                <xsl:call-template name="ois:generate-SVG-image">
+                    <xsl:with-param name="summary" select="$summary" />
+                    <xsl:with-param name="id" select="$id" />
+                    <xsl:with-param name="width" select="$width" />
+                    <xsl:with-param name="height" select="$height" />
+                    <xsl:with-param name="styles" select="''" />
+                    <xsl:with-param name="content" select="concat(
+                        '',
+                        $rows
+                    )"/>
+                </xsl:call-template>
+            </xsl:if>
+        </xsl:variable>
+        <xsl:value-of select="concat('&#xa;&#xa;', $result)" />
     </xsl:function>
 
     <!-- ===================================================== -->
