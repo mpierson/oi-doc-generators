@@ -36,8 +36,8 @@ gen_timeline_plot <- function(k, range_start, range_end, df_dates, ticks) {
     k <- merge(x=k, y=line_pos, by="id", all = TRUE)
 
 
-    # OI_GREEN, OI_ORANGE, OI_BROWN, OI_LIGHT_BLUE
-    colors <- c("#afcc9e", "#f79431", "#c8b483", "#9dcdda")
+    # NEPAL, ORANGE, JAFFA, BLUE_LAGOON, MONTE_CARLO
+    colors <- c("#82a7c5", "#fb4f14", "#ee8a54", "#00969f", "#77c8b3")
     point_color <- data.frame(
         "id"    = unique(k$id),
         "color" = rep(colors, length.out=length(unique(k$id))) )
