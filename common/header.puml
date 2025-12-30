@@ -6,6 +6,7 @@
 !include /home/mpierson/.config/plantuml/ICON_Starling.sprite
 !include /home/mpierson/.config/plantuml/ICON_Syslog.sprite
 !include /home/mpierson/.config/plantuml/ICON_OneIM.sprite
+!include /home/mpierson/.config/plantuml/ICON_ARS.sprite
 !include /home/mpierson/.config/plantuml/vsphere.sprite
 !include /home/mpierson/.config/plantuml/IBM.sprite
 !include /home/mpierson/.config/plantuml/Splunk.sprite
@@ -110,10 +111,10 @@ AddComponentTag("SG_AssetDiscoveryRule", $bgColor=$COLOR_OI_PINK, $fontColor="wh
 AddComponentTag("SG_AccountDiscoveryRule", $bgColor=$COLOR_OI_LIGHT_BLUE, $fontColor="white", $sprite="search,scale=0.7")
 
 AddComponentTag("OneIM_DB", $bgColor=$COLOR_OI_BLUE, $fontColor="white", $borderColor="$COLOR_OI_GRAY"  )
-AddComponentTag("OneIM_JS", $bgColor=$COLOR_OI_BROWN, $fontColor="white" )
-AddComponentTag("OneIM_JQ", $bgColor=$COLOR_OI_BROWN, $fontColor="white", $borderColor="$COLOR_OI_GRAY" )
-AddComponentTag("OneIM_AS", $bgColor=$COLOR_OI_GREEN, $fontColor="white" )
-AddComponentTag("OneIM_AP", $bgColor=$COLOR_OI_GREEN, $fontColor="white" )
+AddComponentTag("OneIM_JS", $bgColor=$COLOR_OI_NEPAL, $fontColor="white" )
+AddComponentTag("OneIM_JQ", $bgColor=$COLOR_OI_NEPAL, $fontColor="white", $borderColor="$COLOR_OI_GRAY" )
+AddComponentTag("OneIM_AS", $bgColor=$COLOR_OI_BLUE_LAGOON, $fontColor="white" )
+AddComponentTag("OneIM_AP", $bgColor=$COLOR_OI_BLUE_LAGOON, $fontColor="white" )
 AddComponentTag("OneIM_TS", $bgColor=$COLOR_OI_ORANGE, $fontColor="white" )
 AddComponentTag("OneIM_TSParent", $bgColor=$COLOR_OI_ORANGE, $fontColor="LightGrey" )
 AddComponentTag("OneIM_SYNC", $bgColor=$COLOR_OI_LIGHT_BLUE, $fontColor="white" )
@@ -167,6 +168,11 @@ AddComponentTag("OneIM_Deploy_WS", $bgColor=$COLOR_OI_MONTE_CARLO, $fontColor="w
 AddComponentTag("OneIM_Deploy_AS", $bgColor=$COLOR_OI_BLUE_LAGOON, $fontColor="white" , $sprite="ICON_OneIM,scale=0.4,color=white" )
 AddComponentTag("OneIM_Deploy_Tools", $bgColor=$COLOR_OI_LOBLOLLY, $fontColor="white" , $sprite="ICON_OneIM,scale=0.4,color=white" )
 
+AddComponentTag("AR_Deploy_DB", $bgColor=$COLOR_OI_JAFFA, $fontColor="white", $borderColor="$COLOR_OI_GRAY" , $sprite="database_server,scale=0.6,color=white"  )
+AddComponentTag("AR_Deploy_AS", $bgColor=$COLOR_OI_JACARTA, $fontColor="white" , $sprite="ICON_ARS,scale=0.4,color=white" )
+
+
+
 AddComponentTag("SG_Deploy_SPP", $bgColor=$COLOR_OI_MONTE_CARLO, $fontColor="white" , $sprite="ICON_SPP,scale=0.4,color=white" )
 AddComponentTag("SG_Deploy_SPS", $bgColor=$COLOR_OI_NEPAL, $fontColor="white" , $sprite="ICON_SPS,scale=0.4,color=white" )
 
@@ -180,6 +186,7 @@ AddComponentTag("Deploy_AzureD365", $bgColor="#0078D4", $fontColor=white, $sprit
 AddComponentTag("Deploy_API", $bgColor="#0078D4", $fontColor=white, $sprite="cogs,scale=0.7,color=white")
 
 AddComponentTag("Deploy_Workday", $bgColor="#0F2E66", $fontColor=white, $sprite="cogs,scale=0.7,color=white")
+AddComponentTag("Deploy_UKG", $bgColor="#005151", $fontColor=white, $sprite="cogs,scale=0.7,color=white")
 AddComponentTag("Deploy_Splunk", $bgColor="#0C1724", $fontColor=white, $sprite="ICON_Splunk,scale=0.3,color=white")
 
 AddNodeTag("Deploy_Area",$bgColor=white, $fontColor=$COLOR_OI_GRAY)
