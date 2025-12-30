@@ -33,6 +33,11 @@
 
 
   <!-- Function to apply default to empty string -->
+  <xsl:function name="ois:ins" as="xs:string">
+    <xsl:param name="s" as="xs:string?"/>
+    <xsl:param name="default" as="xs:string?"/>
+    <xsl:value-of select="ois:is-null-string($s, $default)" />
+  </xsl:function>
   <xsl:function name="ois:is-null-string" as="xs:string">
     <xsl:param name="s" as="xs:string?"/>
     <xsl:param name="default" as="xs:string?"/>
