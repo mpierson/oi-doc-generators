@@ -219,20 +219,22 @@
         </xsl:variable>
 
         <xsl:variable name="stacks">
-            <xsl:for-each-group select="$events-internal/es/e" group-by="@d">
-                <xsl:value-of select="ois:svg-event-markers(
+            <xsl:if test="$x-axis/axis/@height">
+                <xsl:for-each-group select="$events-internal/es/e" group-by="@d">
+                    <xsl:value-of select="ois:svg-event-markers(
                     current-grouping-key(),
                     current-group(),
                     max($bucket-sizes),
                     $x-axis/axis,
                     $height - $x-axis/axis/@height - $y-pad,
                     string(count(current-group()))
-                )" />
-            </xsl:for-each-group>
+                    )" />
+                </xsl:for-each-group>
+            </xsl:if>
         </xsl:variable>
 
         <xsl:variable name="result">
-            <xsl:if test="count(distinct-values($events-internal/es/e/@d)) gt 1">
+            <xsl:if test="count(distinct-values($events-internal/es/e/@d)) gt 1 and $x-axis/axis/@height">
                 <xsl:call-template name="ois:generate-SVG-image">
                     <xsl:with-param name="summary" select="$summary" />
                     <xsl:with-param name="id" select="$id" />
