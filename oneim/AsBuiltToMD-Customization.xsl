@@ -20,6 +20,7 @@
   <xsl:import href="OIS-Markdown.xsl" />
   <xsl:import href="OIS-PlantUML.xsl" />
   <xsl:import href="OIS-SVG.xsl" />
+  <xsl:import href="OIS-R.xsl" />
   <xsl:output omit-xml-declaration="yes" indent="no" method="text" />
 
   <xsl:variable name="apos">'</xsl:variable>
@@ -1198,12 +1199,10 @@ Table: Summary of custom scripts {#tbl:summary-scripts}
         <xsl:variable name="events">
             <xsl:apply-templates select="." mode="events" />
         </xsl:variable>
-        <xsl:value-of select="ois:generate-SVG-timeline(
+        <xsl:value-of select="ois:stacked-bar-plot(
+                $events,
                 concat('Timeline of changes in label ', @name), 
-                concat('change-label-', @id), 
-                800, 200, 
-                '', 
-                $events
+                concat('change-label-', @id) 
             )" />
     </xsl:if>
 
