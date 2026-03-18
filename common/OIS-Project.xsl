@@ -20,6 +20,7 @@
         <xsl:call-template name="ois:generate-plantuml-C4">
             <xsl:with-param name="summary" select="concat('Deploy diagram of _', ../@name, '_ environment')" />
             <xsl:with-param name="id" select="concat('environment-deploy-', ois:escape-markdown-id(../@name))" />
+            <xsl:with-param name="header" select="concat($include-path,'/header.puml')" />
             <xsl:with-param name="content">
                 <xsl:apply-templates select="area" mode="components" />
                 <xsl:apply-templates select="area" mode="relations" />
