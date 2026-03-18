@@ -7,6 +7,8 @@
 !include /home/mpierson/.config/plantuml/ICON_Syslog.sprite
 !include /home/mpierson/.config/plantuml/ICON_OneIM.sprite
 !include /home/mpierson/.config/plantuml/ICON_ARS.sprite
+!include /home/mpierson/.config/plantuml/ICON_SAS.sprite
+!include /home/mpierson/.config/plantuml/ICON_S4SUDO.sprite
 !include /home/mpierson/.config/plantuml/vsphere.sprite
 !include /home/mpierson/.config/plantuml/IBM.sprite
 !include /home/mpierson/.config/plantuml/Splunk.sprite
@@ -173,6 +175,8 @@ AddComponentTag("AR_Deploy_AS", $bgColor=$COLOR_OI_JACARTA, $fontColor="white" ,
 
 
 
+AddComponentTag("SG_Deploy_S4SUDO", $bgColor=$COLOR_OI_BLUE_LAGOON, $fontColor="white" , $sprite="ICON_S4SUDO,scale=0.4,color=white" )
+AddComponentTag("SG_Deploy_SAS", $bgColor=$COLOR_OI_PEAR, $fontColor="white" , $sprite="ICON_SAS,scale=0.4,color=white" )
 AddComponentTag("SG_Deploy_SPP", $bgColor=$COLOR_OI_MONTE_CARLO, $fontColor="white" , $sprite="ICON_SPP,scale=0.4,color=white" )
 AddComponentTag("SG_Deploy_SPS", $bgColor=$COLOR_OI_NEPAL, $fontColor="white" , $sprite="ICON_SPS,scale=0.4,color=white" )
 

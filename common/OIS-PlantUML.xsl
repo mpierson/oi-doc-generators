@@ -121,11 +121,18 @@ scale 1.5
 <xsl:template name="ois:generate-plantuml-C4">
     <xsl:param name="summary" />
     <xsl:param name="id" />
+    <xsl:param name="header" />
     <xsl:param name="content" />
+
+    <xsl:variable name="header-include">
+        <xsl:if test="string-length($header)">
+            <xsl:value-of select="concat('!include_many ', $header)" />
+        </xsl:if>
+    </xsl:variable>
 
     <xsl:if test="string-length($content) &gt; 0">
       <xsl:value-of select="concat('&#xa;&#xa;```{.plantuml caption=&quot;', $summary, '&quot;}')" />
-      <xsl:text>&#xa;&#xa;!include_many header.puml&#xa;&#xa;</xsl:text>
+      <xsl:value-of select="concat('&#xa;&#xa;', $header-include, '&#xa;&#xa;')" />
       <xsl:copy-of select="$content" />
       <xsl:text>&#xa;&#xa;```&#xa;&#xa;</xsl:text>
       <xsl:value-of select="concat('&#xa;&#xa;![', $summary, '](single.png){#fig:', $id, '}&#xa;&#xa;')" />
@@ -158,7 +165,7 @@ scale 1.5
 <xsl:function name="ois:c4-element" as="xs:string">
     <xsl:param name="type" as="xs:string"/>
     <xsl:param name="id" as="xs:string"/>
-    <xsl:param name="name" as="xs:string"/>
+    <xsl:param name="name" as="xs:string?"/>
     <xsl:param name="description" as="xs:string?"/>
     <xsl:param name="tag" as="xs:string?"/>
     <xsl:value-of select="ois:c4-element-ext($type, $id, $name, $description, '', $tag)" />
@@ -167,7 +174,7 @@ scale 1.5
 <xsl:function name="ois:c4-element-ext" as="xs:string">
     <xsl:param name="type" as="xs:string"/>
     <xsl:param name="id" as="xs:string"/>
-    <xsl:param name="name" as="xs:string"/>
+    <xsl:param name="name" as="xs:string?"/>
     <xsl:param name="description" as="xs:string?"/>
     <xsl:param name="type-tag" as="xs:string?"/>
     <xsl:param name="tag" as="xs:string?"/>
@@ -213,9 +220,9 @@ scale 1.5
 </xsl:function>
 <xsl:function name="ois:c4-boundary-ext" as="xs:string">
     <xsl:param name="id" as="xs:string"/>
-    <xsl:param name="name" as="xs:string"/>
-    <xsl:param name="type" as="xs:string"/>
-    <xsl:param name="tag" as="xs:string"/>
+    <xsl:param name="name" as="xs:string?"/>
+    <xsl:param name="type" as="xs:string?"/>
+    <xsl:param name="tag" as="xs:string?"/>
     <xsl:param name="content" as="xs:string"/>
     <xsl:value-of select="concat('&#xa; ', 
                 ois:c4-element-ext('Boundary', $id, $name, '', $type, $tag),
@@ -226,9 +233,9 @@ scale 1.5
 </xsl:function>
 <xsl:function name="ois:c4-boundary" as="xs:string">
     <xsl:param name="id" as="xs:string"/>
-    <xsl:param name="name" as="xs:string"/>
-    <xsl:param name="tag" as="xs:string"/>
-    <xsl:param name="content" as="xs:string"/>
+    <xsl:param name="name" as="xs:string?"/>
+    <xsl:param name="tag" as="xs:string?"/>
+    <xsl:param name="content" as="xs:string?"/>
     <xsl:value-of select="concat('&#xa; ', 
                 ois:c4-element('Boundary', $id, $name, '', $tag),
                 ' {&#xa;',

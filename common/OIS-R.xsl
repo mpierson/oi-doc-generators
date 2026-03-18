@@ -36,7 +36,8 @@ R related utilities (stats/plots)
 
     png('my_plot.png', width = 800, height = 500)
 
-    df = data.frame(col = character(), col = character(), col = numeric(), col = numeric(), col = character(), col = character(), col = character(), col = character(), col = character(), col = character(), stringsAsFactors = FALSE)
+    df = data.frame(
+        col = character(), col = character(), col = numeric(), col = numeric(), col = character(), col = character(), col = character(), col = character(), col = character(), col = character(), stringsAsFactors = FALSE)
     names(df) &lt;- c("Id", "Type", "Freq", "SubFreq", "TimeOfDay", "Offset", "ShortName", "StartDate", "LastRun", "NextRun")
 
     s &lt;- df %&gt;%
@@ -132,10 +133,7 @@ R related utilities (stats/plots)
     <xsl:param name="figure-description"  as="xs:string"/>
     <xsl:param name="figure-id"  as="xs:string"/>
 
-    <xsl:variable name="events-internal">
-        <xsl:apply-templates select="$df-rows/events" mode="events-internal"/>
-    </xsl:variable>
-    <xsl:variable name="dates" as="xs:date*" select="$events-internal/es/e/@d"/>
+    <xsl:variable name="dates" as="xs:date*" select="$df-rows/events/event/xs:date(@date)"/>
     <xsl:variable name="start-date" select="min($dates)" />
     <xsl:variable name="end-date" select="max($dates)" />
 
@@ -173,25 +171,138 @@ R related utilities (stats/plots)
 ![<xsl:value-of select="$figure-description"/>](single.png){#fig:<xsl:value-of select="$figure-id"/>}
 </xsl:variable>
 
+  <xsl:value-of select="if ($duration gt 1) then $result else ''" />
+
+</xsl:function>
+
+<!--
+    stacked bar from
+    <events>
+    <event date="yyyy-mm-dd" count=3 event="jbloggs" />
+    ...
+    </events>
+-->
+<xsl:function name="ois:stacked-bar-plot-events" as="xs:string">
+    <xsl:param name="df-rows" />
+    <xsl:param name="figure-description"  as="xs:string"/>
+    <xsl:param name="figure-id"  as="xs:string"/>
+
+    <xsl:variable name="dates" as="xs:date*" select="$df-rows/events/event/xs:date(@date)"/>
+    <xsl:variable name="start-date" select="min($dates)" />
+    <xsl:variable name="end-date" select="max($dates)" />
+
+    <xsl:variable name="duration" select="days-from-duration($end-date - $start-date)" as="xs:integer" />
+
+    <xsl:variable name="result">
+```{.ggplot2 }
+
+    library(lubridate)
+    library(ggplot2)
+    library(tidyverse)
+    library(dplyr)
+
+    source("OI_theme.R")
+    source("stacked_bar_plot_events.R")
+
+    png('my_plot.png', width = 800, height = 500)
+
+    df &lt;- data.frame( event=c("empty"), count=0, index=0, dt=c(as_date("2025-01-01")) )
+
+    k &lt;- df %&gt;% 
+        <xsl:for-each select="$df-rows/events/event">
+            <xsl:value-of select="concat('# ', @event, ', ', @date, '&#xa;')" />
+            <xsl:value-of select="concat(
+                            'add_row( ',
+                                'event=&quot;', @event, '&quot;, ', 
+                                'count= ', @count, ', ', 
+                                'index= ', @index, ', ', 
+                                'dt=as_date(&quot;', @date, '&quot;)',
+                            ') %&gt;%&#xa;'
+            )" />
+        </xsl:for-each>
+    {}
+
+    # remove the placeholder first row
+    k &lt;- k[-c(1), ]
+
+    # filter out small values
+    k &lt;- k %&gt;% filter_out(count &lt; max(count)/90)
+
+    plot &lt;- gen_stacked_bar_plot_events(k)
+
+```
+![<xsl:value-of select="$figure-description"/>](single.png){#fig:<xsl:value-of select="$figure-id"/>}
+</xsl:variable>
 
   <xsl:value-of select="if ($duration gt 1) then $result else ''" />
 
 </xsl:function>
 
-    <xsl:template match="events" mode="events-internal">
-        <es>
-            <xsl:attribute name="size" select="count(event)" />
-            <xsl:apply-templates select="event" mode="events-internal" />
-        </es>
-    </xsl:template>
-    <xsl:template match="event" mode="events-internal">
-        <e>
-            <xsl:attribute name="date" select="@date" />
-            <xsl:attribute name="d" select="xs:date(@date)" />
-            <xsl:attribute name="ndate" select="translate(@date, '-', '')" />
-            <xsl:attribute name="label" select="text()" />
-            <xsl:attribute name="user" select="@user" />
-        </e>
-    </xsl:template>
+
+<!--
+    multi-facet stacked bar from:
+        <events>
+            <event category="cat-name" name="event-name" date="yyyy-mm-dd" count="n" />
+            ...
+        </events>
+-->
+<xsl:function name="ois:multi-stacked-bar-plot-with-category" as="xs:string">
+    <xsl:param name="df-rows" />
+    <xsl:param name="figure-description"  as="xs:string"/>
+    <xsl:param name="figure-id"  as="xs:string"/>
+
+    <xsl:variable name="dates" as="xs:date*" select="$df-rows/events/event/xs:date(@date)"/>
+    <xsl:variable name="start-date" select="min($dates)" />
+    <xsl:variable name="end-date" select="max($dates)" />
+
+    <xsl:variable name="duration" select="days-from-duration($end-date - $start-date)" as="xs:integer" />
+
+    <xsl:variable name="result">
+        <xsl:if test="$duration gt 1">
+```{.ggplot2 }
+
+    library(lubridate)
+    library(ggplot2)
+    library(tidyverse)
+    library(dplyr)
+
+    source("OI_theme.R")
+    source("multi-facet-stacked_bar_plot.R")
+
+    png('my_plot.png', width = 800, height = 700)
+
+    df &lt;- data.frame( cat=c("empty"), event=c("empty"), count=0, index=0, dt=c(as_date("2025-01-01")) )
+
+    k &lt;- df %&gt;% 
+        <xsl:for-each select="$df-rows/events/event">
+            <xsl:value-of select="concat('# ', @category, ', ', @event, ', ', @date, '&#xa;')" />
+            <xsl:value-of select="concat(
+                            'add_row( ',
+                                'cat=&quot;', @category, '&quot;, ', 
+                                'event=&quot;', @event, '&quot;, ', 
+                                'count= ', @count, ', ', 
+                                'index= ', @index, ', ', 
+                                'dt=as_date(&quot;', @date, '&quot;)',
+                            ') %&gt;%&#xa;'
+            )" />
+        </xsl:for-each>
+    {}
+
+    # remove the placeholder first row
+    k &lt;- k[-c(1), ]
+
+    # filter out small values
+    k &lt;- k %&gt;% filter_out(count &lt; max(count)/15)
+
+    plot &lt;- gen_facet_stacked_bar_plot(k)
+
+```
+![<xsl:value-of select="$figure-description"/>](single.png){#fig:<xsl:value-of select="$figure-id"/>}
+</xsl:if>
+</xsl:variable>
+
+  <xsl:value-of select="if ($duration gt 1) then $result else ''" />
+
+</xsl:function>
 
 </xsl:stylesheet>

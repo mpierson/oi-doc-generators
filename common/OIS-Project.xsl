@@ -131,6 +131,8 @@
                 else if ( $type eq 'SPS' ) then              'SG_Deploy_SPS'
                 else if ( $type eq 'starling connect instance' ) then'StarlingConnect_Connector'
                 else if ( $type eq 'API' ) then              'Deploy_API'
+                else if ( $type eq 'SAS server' ) then       'SG_Deploy_SAS'
+                else if ( $type eq 'S4SUDO server' ) then    'SG_Deploy_S4SUDO'
                 else ''
         " />
     </xsl:function>

@@ -4,16 +4,16 @@
   String related utilities
 
   Author: M Pierson
-  Date: April 2025
-  Version: 0.90
+  Date: March 2026
+  Version: 0.91
 
  -->
-<xsl:stylesheet version="2.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+<xsl:stylesheet version="3.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
                               xmlns:xs="http://www.w3.org/2001/XMLSchema" 
                               xmlns:ois="http://www.oneidentity.com/servers/XSL" >
 
 
-  <!-- Function to convert IP string to integer -->
+<!-- remove content from end of string -->
   <xsl:function name="ois:truncate-string" as="xs:string">
     <xsl:param name="s" as="xs:string?"/>
     <xsl:param name="length" as="xs:integer"/>
@@ -30,6 +30,27 @@
     <xsl:value-of select="$result" />
 
   </xsl:function>
+<!-- remove content from beginning of string -->
+  <xsl:function name="ois:trim-string" as="xs:string">
+    <xsl:param name="s" as="xs:string?"/>
+    <xsl:param name="length" as="xs:integer"/>
+    <xsl:param name="indicator" as="xs:string"/>
+    
+    <xsl:variable name="result">
+    <xsl:choose>
+        <xsl:when test="string-length($s) &gt; $length">
+            <xsl:value-of select="concat(
+                if (string-length($indicator) gt 0) then $indicator else '',
+                substring($s, string-length($s) - $length + 1)
+            )" />
+        </xsl:when>
+        <xsl:otherwise><xsl:value-of select="$s" /></xsl:otherwise>
+    </xsl:choose>
+    </xsl:variable>
+    <xsl:value-of select="$result" />
+
+  </xsl:function>
+
 
 
   <!-- Function to apply default to empty string -->
@@ -50,7 +71,7 @@
   </xsl:function>
 
   <!-- Function to test for empty string -->
-  <xsl:function name="ois:is-empty-string" as="xs:string">
+  <xsl:function name="ois:if-empty-string" as="xs:string">
     <xsl:param name="s" as="xs:string?"/>
     <xsl:param name="on-empty" as="xs:string?"/>
     <xsl:param name="on-non-empty" as="xs:string?"/>
@@ -68,7 +89,7 @@
     <xsl:param name="suffix" as="xs:string?"/>
     
     <xsl:variable name="result">
-        <xsl:value-of select="ois:is-empty-string($s, '', concat($s, $suffix))" />
+        <xsl:value-of select="ois:if-empty-string($s, '', concat($s, $suffix))" />
     </xsl:variable>
     <xsl:value-of select="$result" />
 
@@ -104,7 +125,7 @@
   <xsl:template name="ois:select-by-index" as="xs:string">
     <xsl:param name="i" as="xs:integer" />
     <xsl:param name="values"/>
-    <xsl:value-of select="$values/v[$i]" />
+    <xsl:value-of select="$values/v[$i+1]" />
   </xsl:template>
 
 
@@ -175,7 +196,7 @@
   </xsl:function>
    <xsl:template match="value" mode="simple-list">
        <xsl:if test="string-length(.) &gt; 0">
-           <value> <xsl:value-of select="." /> </value>
+           <value><xsl:value-of select="." /></value>
        </xsl:if>
   </xsl:template>
 
@@ -188,7 +209,7 @@
         <xsl:variable name="codepoints" select="string-to-codepoints($str)"/>
         <xsl:value-of select="ois:fletcher16($codepoints, count($codepoints), 1, 0, 0)"/>
     </xsl:function>
-    <xsl:function name="ois:fletcher16">
+    <xsl:function name="ois:fletcher16" as="xs:integer">
         <xsl:param name="str" as="xs:integer*"/>
         <xsl:param name="len" as="xs:integer" />
         <xsl:param name="index" as="xs:integer" />

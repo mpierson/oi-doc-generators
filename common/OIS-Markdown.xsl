@@ -8,7 +8,7 @@
   Version: 0.90
 
  -->
-<xsl:stylesheet version="2.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+<xsl:stylesheet version="3.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
                               xmlns:xs="http://www.w3.org/2001/XMLSchema" 
                               xmlns:ois="http://www.oneidentity.com/servers/XSL" >
 
@@ -38,7 +38,6 @@
     <xsl:param name="s" as="xs:string"/>
     
     <xsl:variable name="result">
-        <!--<xsl:value-of select="replace($s, '\\`\*_\{\}\[\]\(\)#\+-\.!\|', '')" />-->
         <xsl:value-of select="translate($s, '\`*_#|', '/     ')" />
     </xsl:variable>
     <xsl:value-of select="$result" />
@@ -49,18 +48,8 @@
   <!-- ======= TABLES ============================= -->
 
   <!-- Replace line feeds etc from string, suitable for Markdown table -->
-  <xsl:template name="ois:escape-for-markdown-table">
-    <xsl:param name="s" as="xs:string?"/>
-    <xsl:variable name="tokens" select="tokenize($s, '&#10;')" />
-    <xsl:for-each select="$tokens">
-        <xsl:value-of select="concat(
-            .,
-            if ( count($tokens) gt 1 ) then '&lt;br /&gt;' else ''
-        )" />
-    </xsl:for-each>
-  </xsl:template>
   <xsl:function name="ois:encode-breaks-for-markdown-table" as="xs:string">
-    <xsl:param name="s" as="xs:string"/>
+    <xsl:param name="s" as="xs:string?"/>
     <xsl:variable name="tokens" select="tokenize($s, '&#10;')" />
     <xsl:variable name="result">
         <xsl:for-each select="$tokens">
@@ -89,7 +78,7 @@
                     '&#xa;&#xa;Table: ',
                     $summary,
                     if ( $max-size gt 0 and count($values/rows/row) gt $max-size ) 
-                        then concat(' (top ', $max-size, ')') 
+                        then concat(' (first ', $max-size, ')') 
                         else ''
               )" />
           </xsl:if>
@@ -112,11 +101,7 @@
       <xsl:text> </xsl:text>
   </xsl:template>
   <xsl:template match="value" mode="table">
-      <xsl:variable name="escaped-nodes">
-          <xsl:call-template name="ois:escape-for-markdown-table">
-              <xsl:with-param name="s" select="." />
-          </xsl:call-template>
-      </xsl:variable>
+      <xsl:variable name="escaped-nodes" select="ois:encode-breaks-for-markdown-table(.)" />
       <xsl:choose>
           <xsl:when test="position() = 1">
               <xsl:text>**</xsl:text>
@@ -186,7 +171,7 @@
     <xsl:param name="v" as="xs:double?"/>
 
     <xsl:variable name="result">
-      <xsl:value-of select="if ($v &gt; 0) then concat('&#xa;**', $n, '**: ', $v, '&#xa;') else ''" />
+      <xsl:value-of select="if ($v &gt; 0) then concat('&#xa;&#xa;**', $n, '**: ', $v, '&#xa;') else ''" />
     </xsl:variable>
     <xsl:value-of select="$result" />
   </xsl:function>
@@ -207,11 +192,9 @@
     <xsl:param name="v" as="xs:string?"/>
 
     <xsl:variable name="result">
-        <xsl:choose>
-            <xsl:when test="string-length($v) &gt; 0">
+        <xsl:if test="string-length($v) &gt; 0">
                 <xsl:value-of select="ois:markdown-definition($n, concat('`',$v,'`'))" />
-            </xsl:when>
-        </xsl:choose>
+        </xsl:if>
     </xsl:variable>
     <xsl:value-of select="$result" />
   </xsl:function>
@@ -222,12 +205,10 @@
     <xsl:param name="language" as="xs:string?"/>
 
     <xsl:variable name="result">
-        <xsl:choose>
-            <xsl:when test="string-length($v) &gt; 0">
+        <xsl:if test="string-length($v) &gt; 0">
                 <xsl:value-of select="ois:markdown-definition($n, 
                             concat('&#xa;```',$language,'&#xa;',$v,'&#xa;```&#xa;'))" />
-            </xsl:when>
-        </xsl:choose>
+        </xsl:if>
     </xsl:variable>
     <xsl:value-of select="$result" />
   </xsl:function>
@@ -250,7 +231,7 @@
                     and (
                       not($max-size &gt; 0) 
                       or 
-                      $size &lt; $max-size
+                      $size &lt;= $max-size
                     ) 
               ">
               <xsl:value-of select="concat('&#xa;&#xa;**', normalize-space($header), '**:&#xa;&#xa;')" />
@@ -273,8 +254,9 @@
     <xsl:param name="v" as="xs:string"/>
     <xsl:param name="indent-level" as="xs:integer"/>
     <xsl:variable name="indent-master" select="'                                                                    '"/>
+    <xsl:variable name="indent" select="string-join(for $i in 1 to $indent-level return '  ', '')"/>
     <xsl:variable name="result">
-        <xsl:value-of select="concat(substring($indent-master, 1, $indent-level*2), '- ', $v)" /> 
+        <xsl:value-of select="concat(substring($indent, 1, $indent-level*2), '- ', $v)" /> 
     </xsl:variable>
     <xsl:value-of select="$result" />
   </xsl:function>
@@ -345,7 +327,7 @@
     <xsl:variable name="leader" select="substring($big-leader, 0, $level + 1)" />
 
     <xsl:variable name="result">
-      <xsl:value-of select="concat('&#xa;&#xa;', $leader, ' ', ois:escape-for-markdown($caption), '&#xa;&#xa;')" />
+      <xsl:value-of select="concat('&#xa;&#xa;', $leader, ' ', ois:encode-breaks-for-markdown-table($caption), '&#xa;&#xa;')" />
     </xsl:variable>
     <xsl:value-of select="$result" />
   </xsl:function>
