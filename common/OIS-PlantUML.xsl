@@ -126,7 +126,7 @@ scale 1.5
     <xsl:call-template name="ois:generate-plantuml-C4-generic">
         <xsl:with-param name="summary" select="$summary" />
         <xsl:with-param name="id" select="$id" />
-        <xsl:with-param name="header" select="'/home/mpierson/projects/quest/OneIM/posh-exporter/ois-c4-component.puml'" />
+        <xsl:with-param name="header" select="'https://raw.githubusercontent.com/mpierson/oi-doc-generators/refs/heads/main/plantuml/ois-c4-component.puml'" />
         <xsl:with-param name="content" select="$content" />
     </xsl:call-template>
 </xsl:template>
@@ -138,7 +138,7 @@ scale 1.5
     <xsl:call-template name="ois:generate-plantuml-C4-generic">
         <xsl:with-param name="summary" select="$summary" />
         <xsl:with-param name="id" select="$id" />
-        <xsl:with-param name="header" select="'/home/mpierson/projects/quest/OneIM/posh-exporter/ois-c4-deploy.puml'" />
+        <xsl:with-param name="header" select="'https://raw.githubusercontent.com/mpierson/oi-doc-generators/refs/heads/main/plantuml/ois-c4-deploy.puml'" />
         <xsl:with-param name="content" select="$content" />
     </xsl:call-template>
 </xsl:template>
