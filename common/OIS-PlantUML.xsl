@@ -123,16 +123,34 @@ scale 1.5
     <xsl:param name="id" />
     <xsl:param name="header" />
     <xsl:param name="content" />
-
-    <xsl:variable name="header-include">
-        <xsl:if test="string-length($header)">
-            <xsl:value-of select="concat('!include_many ', $header)" />
-        </xsl:if>
-    </xsl:variable>
+    <xsl:call-template name="ois:generate-plantuml-C4-generic">
+        <xsl:with-param name="summary" select="$summary" />
+        <xsl:with-param name="id" select="$id" />
+        <xsl:with-param name="header" select="'/home/mpierson/projects/quest/OneIM/posh-exporter/ois-c4-component.puml'" />
+        <xsl:with-param name="content" select="$content" />
+    </xsl:call-template>
+</xsl:template>
+<xsl:template name="ois:generate-plantuml-C4-deploy">
+    <xsl:param name="summary" />
+    <xsl:param name="id" />
+    <xsl:param name="header" />
+    <xsl:param name="content" />
+    <xsl:call-template name="ois:generate-plantuml-C4-generic">
+        <xsl:with-param name="summary" select="$summary" />
+        <xsl:with-param name="id" select="$id" />
+        <xsl:with-param name="header" select="'/home/mpierson/projects/quest/OneIM/posh-exporter/ois-c4-deploy.puml'" />
+        <xsl:with-param name="content" select="$content" />
+    </xsl:call-template>
+</xsl:template>
+<xsl:template name="ois:generate-plantuml-C4-generic">
+    <xsl:param name="summary" />
+    <xsl:param name="id" />
+    <xsl:param name="header" />
+    <xsl:param name="content" />
 
     <xsl:if test="string-length($content) &gt; 0">
       <xsl:value-of select="concat('&#xa;&#xa;```{.plantuml caption=&quot;', $summary, '&quot;}')" />
-      <xsl:value-of select="concat('&#xa;&#xa;', $header-include, '&#xa;&#xa;')" />
+      <xsl:value-of select="concat('&#xa;&#xa;!include ', $header ,' &#xa;&#xa;')" />
       <xsl:copy-of select="$content" />
       <xsl:text>&#xa;&#xa;```&#xa;&#xa;</xsl:text>
       <xsl:value-of select="concat('&#xa;&#xa;![', $summary, '](single.png){#fig:', $id, '}&#xa;&#xa;')" />
